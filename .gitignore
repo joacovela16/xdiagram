@@ -1,0 +1,13 @@
+/node_modules/
+/dist/
+/vite-project/.vscode/
+.DS_Store
+/.idea/
+/yarn.lock
+/.yarnrc.yml
+/.pnp.cjs
+/.pnp.loader.mjs
+/components/
+/plugins/
+/themes/
+/index.d.ts
