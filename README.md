@@ -4,10 +4,10 @@ A PaperJS based diagram library.
 
 ### Screenshot
 
-![alt text](./screenshot/screenshot-1.png)
-![alt text](./screenshot/screenshot-2.png)
+![alt text](https://github.com/joacovela16/xdiagram/raw/master/screenshot/screenshot-1.png)
+![alt text](https://github.com/joacovela16/xdiagram/raw/master/screenshot/screenshot-2.png)
 ### GIF
-![alt text](./screenshot/video.gif)
+![alt text](https://github.com/joacovela16/xdiagram/raw/master/screenshot/video.gif)
 
 
 ### Example
