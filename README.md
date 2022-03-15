@@ -1,6 +1,6 @@
 # X-Diagram
 
-A PaperJS based diagram library.
+A customizable PaperJS based diagram library.
 
 ### Screenshot
 
