@@ -1,6 +1,6 @@
 {
   "name": "x-diagram",
-  "version": "0.1.30",
+  "version": "0.1.31",
   "license": "MIT",
   "type": "module",
   "module": "./dist/x-diagram-es.js",
@@ -60,6 +60,10 @@
       "import": "./dist/x-renderers-es.js",
       "require": "./dist/x-renderers-cjs.js"
     }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/joacovela16/xdiagram"
   },
   "keywords": [
     "paperjs",
