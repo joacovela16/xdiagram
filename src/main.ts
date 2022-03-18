@@ -1,11 +1,11 @@
-import "./assets/theme.scss";
 import XDiagram from "./lib/XDiagram";
 import {XBoardPlugin, XCopyPlugin, XDataChangePlugin, XDeletePlugin, XElementPlugin, XInteractionPlugin, XLinkerPlugin, XSelectionPlugin} from "./modules/plugins";
-import type {XEdgeDef, XNodeDef} from "./modules/core";
+import type {XEdgeDef, XNode, XNodeDef} from "./modules/core";
 import {XLightTheme} from "./lib/themes/XThemes";
 import PaperRenderer from "./lib/renderer/PaperRenderer";
 import XArrow from "./lib/components/XArrow";
-import XNodeComponent from "./lib/components/XNodeComponent";
+import XDefaultNode from "./lib/components/XDefaultNode";
+import {XNodePort} from "./modules/components";
 
 document.body.style.width = '100%';
 document.body.style.height = '400px';
@@ -17,7 +17,8 @@ const xDiagram = new XDiagram(document.body, {
     edges: [],
     nodes: [],
     catalog: [
-        XNodeComponent({name: 'rounded-node', strokeWidth: 2, padding: 24, radius: 8})
+        XDefaultNode({name: 'rounded-node', strokeWidth: 2, padding: 24, radius: 8}),
+        XNodePort({name: 'port', strokeWidth: 2, padding: 24, radius: 8}),
     ],
     plugins: [
         XElementPlugin,
@@ -46,6 +47,9 @@ xDiagram.getHookListener().filter('on-prepare-node-copy', (cfg: XNodeDef) => {
     cfg.text = `${cfg.text}-copy`;
     return cfg;
 });
+xDiagram.getHookListener().filter('x-linker-button-plugin-can-apply', (value:boolean, node:XNode)=> {
+    return node.data.type !== 'port';
+})
 
 xDiagram.addNode({
     id: 0,
@@ -73,6 +77,19 @@ xDiagram.addNode({
     text: 'Task-3',
     position: {
         x: 200,
+        y: 200,
+    }
+});
+
+
+xDiagram.addNode({
+    id: 3,
+    type: 'port',
+    text: 'Port 1',
+    inNumber: 2,
+    outNumber: 1,
+    position: {
+        x: 400,
         y: 200,
     }
 });

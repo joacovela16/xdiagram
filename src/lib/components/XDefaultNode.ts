@@ -27,7 +27,7 @@ interface RoundedNodeConf extends XNodeDef {
     fillColor: string;
 }
 
-export default function XNodeComponent(conf: XNodeRectDef): XNodeFactory {
+export default function XDefaultNode(conf: XNodeRectDef): XNodeFactory {
     return defineNode<RoundedNodeConf>({
         name: conf.name,
         handler: function (context: XContext, cfg: RoundedNodeConf): XNode {
