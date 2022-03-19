@@ -1,5 +1,5 @@
-import {XContext, XNodeDef, XNodeFactory, XTheme} from "../shared/XTypes";
-import {defineNode} from "../shared/XHelper";
+import {XContext, XNodeDef, XElementFactory, XTheme} from "../shared/XTypes";
+import {defineElement} from "../shared/XHelper";
 import {XNode, XPoint} from "../shared/XRender";
 import {doLinkZone, doReceptor, getOrElse} from "../shared/XLib";
 import {Command, HookActionEnum, HookFilterEnum} from "../shared/Instructions";
@@ -47,10 +47,10 @@ type XNodePortBase = {
 
 type XNodePortConf = XNodePortBase & XNodeDef;
 
-export default function XNodePort(cfg: XNodeBase): XNodeFactory {
+export default function XNodePort(cfg: XNodeBase): XElementFactory {
 
 
-    return defineNode<XNodePortConf>({
+    return defineElement<XNodePortConf>({
         name: cfg.name,
         handler(ctx: XContext, config: XNodePortConf): XNode {
             const finalCfg: XNodePortConf = {...cfg, ...config};

@@ -14,7 +14,7 @@ const XSelectionPlugin: XPluginDef = definePlugin({
         let lastSelection: XNode;
 
         actionListener(HookActionEnum.ELEMENT_SELECTED, showBox);
-        actionListener(HookActionEnum.ELEMENT_DRAG_START, hideBox);
+        actionListener(HookActionEnum.ELEMENT_START_DRAG, hideBox);
         actionListener(HookActionEnum.BOARD_CLICK, hideBox);
         actionListener(HookActionEnum.ELEMENT_DELETED, () => hideBox());
 

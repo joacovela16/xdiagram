@@ -1,8 +1,9 @@
 import {doLinkZone, doNumberSnap, doReceptor, getOrElse} from "../shared/XLib";
-import {type XContext, type XNodeDef, type XNodeFactory, type XTheme} from "../shared/XTypes";
+import {type XContext, XElementDef, type XElementFactory, type XTheme} from "../shared/XTypes";
 import type {XBuilder, XNode} from "../shared/XRender";
 import {Command, HookActionEnum, HookFilterEnum} from "../shared/Instructions";
-import {defineNode} from "../shared/XHelper";
+import {defineElement} from "../shared/XHelper";
+import {MAKE_INTERACTIVE} from "../plugins/XInteractivePlugin";
 
 interface XNodeRectDef {
     name: string;
@@ -16,22 +17,11 @@ interface XNodeRectDef {
     fillColor?: string;
 }
 
-interface RoundedNodeConf extends XNodeDef {
-    text: string;
-    fontSize: number,
-    radius: number;
-    padding: number;
-    textColor: string;
-    strokeColor: string;
-    strokeWidth: number;
-    fillColor: string;
-}
-
-export default function XDefaultNode(conf: XNodeRectDef): XNodeFactory {
-    return defineNode<RoundedNodeConf>({
+export default function XDefaultNode(conf: XNodeRectDef): XElementFactory {
+    return defineElement({
         name: conf.name,
-        handler: function (context: XContext, cfg: RoundedNodeConf): XNode {
-            const config: RoundedNodeConf = {...cfg, ...conf};
+        handler: function (context: XContext, cfg: XElementDef): XNode {
+            const config: XElementDef = {...cfg, ...conf};
             const position = config.position;
             const b: XBuilder = context.builder;
             const actionDispatcher = context.hookManager.dispatcher.action;
@@ -72,9 +62,10 @@ export default function XDefaultNode(conf: XNodeRectDef): XNodeFactory {
                         rectEl.strokeColor = theme.error;
                     },
                     [Command.remove]() {
-                        if (filterDispatcher(HookFilterEnum.NODE_CAN_REMOVE, true, rootEl) && context.removeNode(config.id)) {
+                        if (filterDispatcher(HookFilterEnum.NODE_CAN_REMOVE, true, rootEl) ) {
+                            context.removeElement(config.id);
                             rootEl.remove();
-                            actionDispatcher(HookActionEnum.NODE_DELETED, config);
+                            actionDispatcher(HookActionEnum.ELEMENT_DELETED, config);
                         }
                     }
                 }
@@ -93,6 +84,7 @@ export default function XDefaultNode(conf: XNodeRectDef): XNodeFactory {
             context.frontLayer.addChild(rootEl);
 
             doLinkZone(rootEl, context);
+            actionDispatcher(MAKE_INTERACTIVE, rootEl);
 
             return rootEl;
         }

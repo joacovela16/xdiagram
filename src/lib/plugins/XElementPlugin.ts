@@ -9,21 +9,21 @@ const XElementPlugin = definePlugin({
         const actionListener = hook.listener.action;
         const actionDispatcher = hook.dispatcher.action;
 
-        actionDispatcher(HookActionEnum.NODE_INSTALLED, doCreate);
-        actionDispatcher(HookActionEnum.EDGE_INSTALLED, doCreate);
+        // actionDispatcher(HookActionEnum.NODE_INSTALLED, doCreate);
+        // actionDispatcher(HookActionEnum.EDGE_INSTALLED, doCreate);
 
-        actionListener(HookActionEnum.EDGE_SELECTED, doSelection);
-        actionListener(HookActionEnum.NODE_SELECTED, doSelection);
-        actionListener(HookActionEnum.EDGE_END_DRAG, doSelection);
+        // actionListener(HookActionEnum.EDGE_SELECTED, doSelection);
+        // actionListener(HookActionEnum.NODE_SELECTED, doSelection);
+        // actionListener(HookActionEnum.EDGE_END_DRAG, doSelection);
 
-        actionListener(HookActionEnum.NODE_DRAG_START, doDrag);
-        actionListener(HookActionEnum.EDGE_START_DRAG, doDrag);
+        // actionListener(HookActionEnum.NODE_DRAG_START, doDrag);
+        // actionListener(HookActionEnum.EDGE_START_DRAG, doDrag);
 
-        actionListener(HookActionEnum.EDGE_UNSELECTED, unselectAll);
-        actionListener(HookActionEnum.NODE_UNSELECTED, unselectAll);
+        // actionListener(HookActionEnum.EDGE_UNSELECTED, unselectAll);
+        // actionListener(HookActionEnum.NODE_UNSELECTED, unselectAll);
 
-        actionListener(HookActionEnum.NODE_DELETED, doDelete);
-        actionListener(HookActionEnum.EDGE_DELETED, doDelete);
+        // actionListener(HookActionEnum.NODE_DELETED, doDelete);
+        // actionListener(HookActionEnum.EDGE_DELETED, doDelete);
 
         function doCreate(node: XNode) {
             actionDispatcher(HookActionEnum.ELEMENT_CREATED, node);
@@ -33,7 +33,7 @@ const XElementPlugin = definePlugin({
             actionDispatcher(HookActionEnum.ELEMENT_DELETED, cfg);
         }
         function doDrag(node: XNode) {
-            actionDispatcher(HookActionEnum.ELEMENT_DRAG_START, node);
+            actionDispatcher(HookActionEnum.ELEMENT_START_DRAG, node);
         }
 
         function doSelection(node: XNode) {

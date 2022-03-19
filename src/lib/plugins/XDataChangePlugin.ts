@@ -23,12 +23,7 @@ export default function XDataChangePlugin() {
             });
 
             function prepareData() {
-                // console.clear();
-                const data = {
-                    nodes: context.getNodes().map(x => x.element.data).toArray(),
-                    edges: context.getLinks().map(x => x.element.data).toArray()
-                }
-
+                const data = context.getElements().map(x => x.data).toArray()
                 actionDispatcher(X_ON_DATA_CHANGE_EVENT, data);
             }
         }

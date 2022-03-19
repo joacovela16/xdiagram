@@ -8,13 +8,11 @@ const PREPARE_NODE_COPY: string = 'on-prepare-node-copy';
 export const XCopyPlugin = XToolBuilder('x-copy-plugin', (context, hook) => {
     const filterDispatcher = hook.dispatcher.filter;
     return {
-        selectEvents: [HookActionEnum.NODE_SELECTED],
+        selectEvents: [HookActionEnum.ELEMENT_SELECTED],
         unselectEvents: [
-            HookActionEnum.NODE_UNSELECTED,
             HookActionEnum.BOARD_CLICK,
-            HookActionEnum.ELEMENT_DRAG_START,
+            HookActionEnum.ELEMENT_START_DRAG,
             HookActionEnum.ELEMENT_DELETED,
-            HookActionEnum.EDGE_SELECTED
         ],
         onClick(node) {
             const data = node.data;
@@ -51,7 +49,7 @@ export const XCopyPlugin = XToolBuilder('x-copy-plugin', (context, hook) => {
 export const XDeletePlugin = XToolBuilder('x-element-delete', () => {
     return {
         selectEvents: [HookActionEnum.ELEMENT_SELECTED],
-        unselectEvents: [HookActionEnum.ELEMENT_DRAG_START, HookActionEnum.BOARD_CLICK, HookActionEnum.ELEMENT_DELETED],
+        unselectEvents: [HookActionEnum.ELEMENT_START_DRAG, HookActionEnum.BOARD_CLICK, HookActionEnum.ELEMENT_DELETED],
         getPosition(bound: XBound): XPoint {
             const position = bound.topRight.clone();
             position.x += 10;

@@ -1,5 +1,7 @@
 import {XNode} from "./XRender";
-import {XContext, XEdgeDef, XEdgeFactory, XEdgeHandler, XNodeDef, XNodeFactory, XNodeHandler, XPluginDef} from "./XTypes";
+import {XContext, XElementDef, XElementFactory, XElementHandler, XPluginDef} from "./XTypes";
+
+/*
 
 export function defineEdge<T extends XEdgeDef = XEdgeDef>(edgeDef: XEdgeHandler): XEdgeFactory {
 
@@ -12,13 +14,14 @@ export function defineEdge<T extends XEdgeDef = XEdgeDef>(edgeDef: XEdgeHandler)
         }
     };
 }
+*/
 
-export function defineNode<T extends XNodeDef>(nodeDef: XNodeHandler): XNodeFactory {
-    const name: string = nodeDef.name;
-    const handler = nodeDef.handler;
+export function defineElement(elementHandler: XElementHandler): XElementFactory {
+    const name: string = elementHandler.name;
+    const handler = elementHandler.handler;
     return {
         name,
-        build(context: XContext, config: T): XNode {
+        build(context: XContext, config: XElementDef): XNode {
             return handler(context, config);
         }
     };

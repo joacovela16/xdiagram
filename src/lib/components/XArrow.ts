@@ -1,6 +1,6 @@
 import {cutSegment, doHover, doReceptor, doSnap, getOrElse, isUndefined, Timer} from "../shared/XLib";
-import type {XContext, XEdgeDef, XEdgeFactory, XID, XTheme} from "../shared/XTypes";
-import {defineEdge} from "../shared/XHelper";
+import type {XContext, XEdgeDef, XElementDef, XElementFactory, XID, XTheme} from "../shared/XTypes";
+import {defineElement} from "../shared/XHelper";
 import type {XBuilder, XItem, XNode, XPoint} from "../shared/XRender";
 import {PathHelper} from "../shared/XRender";
 import {Command, HookActionEnum, HookFilterEnum} from "../shared/Instructions";
@@ -35,13 +35,15 @@ interface ArrowConf extends XEdgeDef {
     targetPointer?: boolean | ArrowExtremeConf;
 }
 
+type Coord = { x: number; y: number };
+
 function isZero(n: number, epsilon: number = 0.05) {
     return n > -epsilon && n < epsilon;
 }
 
-const XArrow: XEdgeFactory = defineEdge<ArrowConf>({
-    name: 'default-arrow',
-    handler: function (context: XContext, config: ArrowConf): XNode {
+const XArrow: XElementFactory = defineElement({
+    name: 'x-arrow',
+    handler: function (context: XContext, config: XElementDef): XNode {
 
         const ID: XID = config.id;
         const b: XBuilder = context.builder;
@@ -54,8 +56,9 @@ const XArrow: XEdgeFactory = defineEdge<ArrowConf>({
 
         const pathTool = b.makePath();
         pathTool.visible = false;
+        isUndefined(config.stages) && (config.stages = []);
 
-        const initialStages: { x: number, y: number }[] = config.stages || [];
+        const initialStages: Coord[] = config.stages;
 
         let stagesCount: number = initialStages.length;
         let isDraggingMode: boolean = false;
@@ -66,7 +69,9 @@ const XArrow: XEdgeFactory = defineEdge<ArrowConf>({
         const theme: XTheme = context.theme;
         const actionDispatcher = context.hookManager.dispatcher.action;
         const filterDispatcher = context.hookManager.dispatcher.filter;
-        const confReactive = doReactive<ArrowConf>(config);
+        const confReactive = doReactive<XElementDef>(config);
+
+        actionDispatcher('x-arrow-config-mapper', config);
 
         const dragTimer = new Timer(300);
         const stages: XStage[] = []
@@ -83,13 +88,14 @@ const XArrow: XEdgeFactory = defineEdge<ArrowConf>({
                     dragTimer.handle(() => updateData());
                 },
                 [Command.remove]() {
-                    if (filterDispatcher(HookFilterEnum.EDGE_CAN_REMOVE, true, rootEl) && context.removeLink(ID)) {
+                    if (filterDispatcher(HookFilterEnum.EDGE_CAN_REMOVE, true, rootEl)) {
+                        context.removeElement(ID);
                         rootEl.remove();
-                        actionDispatcher(HookActionEnum.EDGE_DELETED, config);
+                        actionDispatcher(HookActionEnum.ELEMENT_DELETED, config);
                         confReactive.clean();
                     }
                 },
-                [Command.config](cfg: ArrowConf) {
+                [Command.config](cfg: XElementDef) {
                     confReactive.set(cfg);
                 }
             }
@@ -107,8 +113,15 @@ const XArrow: XEdgeFactory = defineEdge<ArrowConf>({
         let nodeSetter: (n: XItem) => void;
         let srcRefNode: XNode, trgRefNode: XNode;
 
-        context.getNode(config.src).foreach(x => srcRefNode = x.element);
-        context.getNode(config.trg).foreach(x => trgRefNode = x.element);
+        context.getElement(config.src).foreach(x => {
+            srcRefNode = x;
+            isUndefined(stages[0]) && stages.push({index: 0, point: x.bounds.center});
+
+        });
+        context.getElement(config.trg).foreach(x => {
+            trgRefNode = x;
+            isUndefined(stages[1]) && stages.push({index: 1, point: x.bounds.center});
+        });
 
         for (let i = 0; i < stagesCount; i++) {
             const datum = initialStages[i];
@@ -165,7 +178,8 @@ const XArrow: XEdgeFactory = defineEdge<ArrowConf>({
             } else {
                 isSelectionMode = true;
                 setToolsVisible(true);
-                actionDispatcher(HookActionEnum.EDGE_SELECTED, rootEl);
+                // actionDispatcher(HookActionEnum.EDGE_SELECTED, rootEl);
+                actionDispatcher(HookActionEnum.ELEMENT_SELECTED, rootEl);
             }
         });
 
@@ -227,7 +241,8 @@ const XArrow: XEdgeFactory = defineEdge<ArrowConf>({
             circle.on('mousedown', () => {
                 timer.handle(() => {
                     isDraggingMode = true;
-                    actionDispatcher(HookActionEnum.EDGE_START_DRAG, rootEl);
+                    // actionDispatcher(HookActionEnum.EDGE_START_DRAG, rootEl);
+                    actionDispatcher(HookActionEnum.ELEMENT_START_DRAG, rootEl);
                 });
             });
             circle.on('mouseup', () => {
@@ -235,7 +250,8 @@ const XArrow: XEdgeFactory = defineEdge<ArrowConf>({
                         isDraggingMode && (isDraggingMode = false);
                         isSelectionMode = true;
                         setToolsVisible(true);
-                        actionDispatcher(HookActionEnum.EDGE_END_DRAG, rootEl);
+                        // actionDispatcher(HookActionEnum.EDGE_END_DRAG, rootEl);
+                        actionDispatcher(HookActionEnum.ELEMENT_END_DRAG, rootEl);
                         updateData();
                     });
                 }
@@ -263,7 +279,8 @@ const XArrow: XEdgeFactory = defineEdge<ArrowConf>({
 
                     updatePositions();
                     updateData();
-                    actionDispatcher(HookActionEnum.EDGE_SELECTED, rootEl);
+                    // actionDispatcher(HookActionEnum.EDGE_SELECTED, rootEl);
+                    actionDispatcher(HookActionEnum.ELEMENT_SELECTED, rootEl);
                 }
             );
             rootEl.addChild(circle);
@@ -437,11 +454,11 @@ const XArrow: XEdgeFactory = defineEdge<ArrowConf>({
                     timer.clear();
                     timer.handle(() => {
                         context
-                            .getNodes()
-                            .find(x => x.element.contains(event.point))
-                            .foreach(x => {
+                            .getElements()
+                            .filter(x => x.data.linkable === true)
+                            .find(x => x.contains(event.point))
+                            .foreach(node => {
 
-                                const node = x.element;
 
                                 if (isUndefined(nodeSelection) || nodeSelection.id !== node.id) {
                                     if (isUndefined(srcRefNode) && isUndefined(trgRefNode)) {
@@ -465,21 +482,22 @@ const XArrow: XEdgeFactory = defineEdge<ArrowConf>({
 
             secondaryEl.on('mousedown', e => {
                 context
-                    .getNode(nodeIDBound)
+                    .getElement(nodeIDBound)
                     .foreach(node => {
                         if (isSource) {
                             srcRefNode = null;
                             config.src = undefined;
-                            node.out.findAndRemove(x => x.id === ID && x.src === nodeIDBound);
+                            //node.out.findAndRemove(x => x.id === ID && x.src === nodeIDBound);
                         } else {
                             trgRefNode = null;
                             config.trg = undefined;
-                            node.in.findAndRemove(x => x.id === ID && x.trg === nodeIDBound);
+                            //node.in.findAndRemove(x => x.id === ID && x.trg === nodeIDBound);
                         }
-                        context.removeLink(ID, false);
+                        //context.removeLink(ID, false);
                         nodeSetter = setter;
                         isDraggingMode = true;
-                        actionDispatcher(HookActionEnum.EDGE_START_DRAG, rootEl);
+                        actionDispatcher(HookActionEnum.ELEMENT_START_DRAG, rootEl);
+                        // actionDispatcher(HookActionEnum.EDGE_START_DRAG, rootEl);
                     });
             });
 
@@ -494,7 +512,7 @@ const XArrow: XEdgeFactory = defineEdge<ArrowConf>({
                     nodeSelection.command(Command.onNodeNormal);
                     nodeSelection = null;
 
-                    context.getLink(ID).fold(
+                    /*context.getLink(ID).fold(
                         (link) => {
                             link.src = srcRefNode && srcRefNode.id;
                             link.trg = trgRefNode && trgRefNode.id;
@@ -507,11 +525,12 @@ const XArrow: XEdgeFactory = defineEdge<ArrowConf>({
                                 trg: trgRefNode && trgRefNode.id
                             });
                         }
-                    )
+                    )*/
 
                 }
                 nodeSetter = null;
-                actionDispatcher(HookActionEnum.EDGE_END_DRAG, rootEl);
+                // actionDispatcher(HookActionEnum.EDGE_END_DRAG, rootEl);
+                actionDispatcher(HookActionEnum.ELEMENT_END_DRAG, rootEl);
             });
             secondaryEl.on('mouseenter', () => htmlElement.style.cursor = 'pointer');
             secondaryEl.on('mouseleave', e => !isDraggingMode && hideAll());
@@ -542,17 +561,17 @@ const XArrow: XEdgeFactory = defineEdge<ArrowConf>({
             function buildSetter() {
                 if (isSource) {
                     return (node: XNode) => {
-                        if (context.addLink({id: ID, element: rootEl, src: node.id})) {
-                            srcRefNode = node;
-                            config.src = node.id;
-                        }
+                        // if (context.addLink({id: ID, element: rootEl, src: node.id})) {
+                        srcRefNode = node;
+                        config.src = node.id;
+                        // }
                     };
                 } else {
                     return (node: XNode) => {
-                        if (context.addLink({id: ID, element: rootEl, trg: node.id})) {
-                            trgRefNode = node;
-                            config.trg = node.id;
-                        }
+                        // if (context.addLink({id: ID, element: rootEl, trg: node.id})) {
+                        trgRefNode = node;
+                        config.trg = node.id;
+                        // }
                     };
                 }
             }

@@ -129,6 +129,12 @@ export class LinkedList<T> {
         return result;
     }
 
+    filter(f: (x:T) => boolean): LinkedList<T>{
+        const result = new LinkedList<T>();
+        this.forEach(x => f(x) && result.append(x));
+        return result;
+    }
+
     find(p: (item: T) => boolean): Option<T> {
         const record = this.findRecord(p);
         return record.map(x => x.data);

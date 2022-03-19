@@ -1,5 +1,5 @@
 import XDiagram from "./lib/XDiagram";
-import {XBoardPlugin, XCopyPlugin, XDataChangePlugin, XDeletePlugin, XElementPlugin, XInteractionPlugin, XLinkerPlugin, XSelectionPlugin} from "./modules/plugins";
+import {XBoardPlugin, XCopyPlugin, XDataChangePlugin, XDeletePlugin, XElementPlugin, XInteractivePlugin, XLinkerPlugin, XSelectionPlugin} from "./modules/plugins";
 import type {XEdgeDef, XNode, XNodeDef} from "./modules/core";
 import {XLightTheme} from "./lib/themes/XThemes";
 import PaperRenderer from "./lib/renderer/PaperRenderer";
@@ -19,13 +19,14 @@ const xDiagram = new XDiagram(document.body, {
     catalog: [
         XDefaultNode({name: 'rounded-node', strokeWidth: 2, padding: 24, radius: 8}),
         XNodePort({name: 'port', strokeWidth: 2, padding: 24, radius: 8}),
+        XArrow
     ],
     plugins: [
         XElementPlugin,
         XBoardPlugin,
         XSelectionPlugin,
-        XLinkerPlugin(XArrow),
-        XInteractionPlugin,
+        XLinkerPlugin(),
+        XInteractivePlugin,
         XDeletePlugin,
         XCopyPlugin,
         XDataChangePlugin()
@@ -34,26 +35,27 @@ const xDiagram = new XDiagram(document.body, {
 
 // xDiagram.getHookListener().filter(HookFilterEnum.NODES_CAN_LINK, () => false);
 
-xDiagram.getHookListener().action('x-on-data-change', data => {
+xDiagram.getListener().action('x-on-data-change', data => {
     console.log(data)
 });
 
-xDiagram.getHookListener().filter('x-arrow-config-mapper', (cfg: XEdgeDef) => {
+xDiagram.getListener().action('x-arrow-config-mapper', (cfg: XEdgeDef) => {
     cfg.targetPointer = true;
     return cfg;
 });
 
-xDiagram.getHookListener().filter('on-prepare-node-copy', (cfg: XNodeDef) => {
+xDiagram.getListener().filter('on-prepare-node-copy', (cfg: XNodeDef) => {
     cfg.text = `${cfg.text}-copy`;
     return cfg;
 });
-xDiagram.getHookListener().filter('x-linker-button-plugin-can-apply', (value:boolean, node:XNode)=> {
+
+xDiagram.getListener().filter('x-linker-button-plugin-can-apply', (value:boolean, node:XNode)=> {
     return node.data.type !== 'port';
 })
 
-xDiagram.addNode({
+xDiagram.addElement({
     id: 0,
-    type: 'rounded-node',
+    solver: 'rounded-node',
     position: {
         x: 100,
         y: 100,
@@ -61,9 +63,9 @@ xDiagram.addNode({
     text: 'Task-1'
 });
 
-xDiagram.addNode({
+xDiagram.addElement({
     id: 1,
-    type: 'rounded-node',
+    solver: 'rounded-node',
     text: 'Task-2',
     position: {
         x: 400,
@@ -71,9 +73,9 @@ xDiagram.addNode({
     }
 });
 
-xDiagram.addNode({
+xDiagram.addElement({
     id: 2,
-    type: 'rounded-node',
+    solver: 'rounded-node',
     text: 'Task-3',
     position: {
         x: 200,
@@ -82,7 +84,8 @@ xDiagram.addNode({
 });
 
 
-xDiagram.addNode({
+/*
+xDiagram.addElement({
     id: 3,
     type: 'port',
     text: 'Port 1',
@@ -93,6 +96,17 @@ xDiagram.addNode({
         y: 200,
     }
 });
+*/
+/*
 
-xDiagram.addEdge(0, 1);
-xDiagram.addEdge(2, 1);
+xDiagram.addElement({
+    solver: 'x-arrow',
+    src: 0,
+    trg: 1,
+});
+*/
+xDiagram.addElement({
+    solver: 'x-arrow',
+    src: 2,
+    trg: 1,
+});

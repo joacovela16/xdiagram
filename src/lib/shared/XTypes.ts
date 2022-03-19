@@ -2,8 +2,11 @@ import type {LinkedList} from "./XList";
 import type {XBuilder, XBuilderFactory, XItem, XNode} from "./XRender";
 import type {HookActionEnum, HookFilterEnum} from "./Instructions";
 import type {Option} from "./Option";
+import {Record} from "./XList";
 
 export type XID = number;
+
+export type Holder<T> = { state: T, ref: Record<T> };
 
 type XNodeBase = {
     id: XID;
@@ -19,13 +22,19 @@ type XEdgeBase = {
 
 export type XData = { [index: string]: any };
 
-export type XNodeDef = XNodeBase & XData;
+type XElementBase  = {
+    id?: XID;
+    solver: string;
+};
 
+export type XElementDef = XElementBase & XData;
+
+export type XNodeDef = XNodeBase & XData;
 export type XEdgeDef = XEdgeBase & XData;
 
 export type XDiagramOptions = {
     id: string;
-    catalog: XNodeFactory[];
+    catalog: XElementFactory[];
     nodes: XNodeDef [];
     edges: XEdgeDef[];
     plugins: XPluginDef[];
@@ -43,6 +52,7 @@ export type XArrowState = {
     src?: number;
     trg?: number;
 };
+
 
 export type XNodeState = {
     element: XNode;
@@ -77,29 +87,32 @@ export type XPluginDef = {
     plugin: XPlugin
 }
 
-export type XNodeHandler = {
+export type XElementHandler = {
     name: string;
-    handler(ctx: XContext, config: XNodeDef): XNode
+    handler(ctx: XContext, config: XElementDef): XNode
 };
 
+/*
 export type XEdgeHandler = {
     name: string;
     handler(ctx: XContext, config: XEdgeDef): XNode
 };
+*/
 
-export interface XNodeFactory {
+export interface XElementFactory {
     name: string;
     description?: string;
-
-    build(context: XContext, config: XNodeDef): XNode;
+    build(context: XContext, config: XElementDef): XNode;
 }
 
+/*
 export interface XEdgeFactory {
     name: string;
     description?: string;
 
-    build(context: XContext, config: XEdgeDef): XNode;
+    build(context: XContext, config: XElementDef): XNode;
 }
+*/
 
 export interface XContext {
     builder: XBuilder;
@@ -111,11 +124,21 @@ export interface XContext {
     middleLayer: XItem;
     frontLayer: XItem;
 
+    getElements(): LinkedList<XNode>;
+
+    getElement(id: XID): Option<XNode>;
+
+    addElement(node:XNode):void;
+
+    removeElement(id:XID): void;
+/*
+
     getNodes(): LinkedList<XNodeState>;
 
     getNode(id: XID): Option<XNodeState>;
 
     existsNode(id: XID): boolean;
+
     existsLink(id: XID): boolean;
 
     addNode(state: XNodeState): boolean;
@@ -129,6 +152,7 @@ export interface XContext {
     removeLink(id: XID, full?: boolean): boolean;
 
     removeNode(id: XID): boolean;
+*/
 
     activePlugin(cfg: XPluginDef): void
 }

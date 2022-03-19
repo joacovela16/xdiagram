@@ -1,10 +1,11 @@
-import {asMap, doHookBuilder, getOrElse, isDefined, isUndefined} from "./shared/XLib";
-import {LinkedList, Record} from "./shared/XList";
-import type {HookDispatcher, HookListener, HookManager, XArrowState, XContext, XData, XDiagramOptions, XID, XNodeDef, XNodeFactory, XNodeState, XPluginDef, XTheme} from "./shared/XTypes";
-import {Command, HookActionEnum, HookFilterEnum} from "./shared/Instructions";
+import {asMap, doHookBuilder, idGen, isUndefined} from "./shared/XLib";
+import {LinkedList} from "./shared/XList";
+import type {Holder, HookDispatcher, HookListener, HookManager, XContext, XDiagramOptions, XElementFactory, XID, XPluginDef, XTheme} from "./shared/XTypes";
+import {XElementDef} from "./shared/XTypes";
+import {HookActionEnum} from "./shared/Instructions";
 import doOption, {Option} from "./shared/Option";
+import {XNode} from "./shared/XRender";
 
-type Holder<T> = { state: T, ref: Record<T> };
 
 export default class XDiagram {
 
@@ -14,13 +15,10 @@ export default class XDiagram {
     constructor(element: HTMLElement, options: XDiagramOptions) {
 
         const theme: XTheme = options.theme;
-        const catalog: Map<string, XNodeFactory> = asMap(options.catalog, x => x.name);
+        const catalog: Map<string, XElementFactory> = asMap(options.catalog, x => x.name);
 
-        const nodeMapStore: Map<XID, Holder<XNodeState>> = new Map<XID, Holder<XNodeState>>();
-        const nodeListStore: LinkedList<XNodeState> = new LinkedList<XNodeState>();
-
-        const linkMapStore: Map<XID, Holder<XArrowState>> = new Map<XID, Holder<XArrowState>>();
-        const linkListStore: LinkedList<XArrowState> = new LinkedList<XArrowState>();
+        const elementMapStore: Map<XID, Holder<XNode>> = new Map<XID, Holder<XNode>>();
+        const elementListStore: LinkedList<XNode> = new LinkedList<XNode>();
 
         const builder = options.renderer(element);
         const backLayer = builder.makeGroup();
@@ -47,7 +45,23 @@ export default class XDiagram {
                 this.options.plugins.push(cfg);
                 cfg.plugin(this, hookManager)
             },
-            existsNode(id: XID): boolean {
+            getElements(): LinkedList<XNode> {
+                return elementListStore;
+            },
+            removeElement(id: XID) {
+                doOption(elementMapStore.get(id)).foreach(x => {
+                    x.ref.remove();
+                    elementMapStore.delete(id);
+                });
+            },
+            addElement(node: XNode) {
+                const ref = elementListStore.append(node)
+                elementMapStore.set(node.id, {state: node, ref});
+            },
+            getElement(id: XID): Option<XNode> {
+                return doOption(elementMapStore.get(id)).map(x => x.state);
+            }
+            /*existsNode(id: XID): boolean {
                 return nodeMapStore.has(id);
             },
             existsLink(id: XID): boolean {
@@ -143,13 +157,13 @@ export default class XDiagram {
             },
             getLinks(): LinkedList<XArrowState> {
                 return linkListStore;
-            }
+            }*/
         };
         actionDispatcher(HookActionEnum.BEFORE_START);
 
         options.plugins.forEach(x => x.plugin(context, hookManager));
 
-        actionListener(HookActionEnum.NODE_ADD, (node: XNodeDef): void => {
+        /*actionListener(HookActionEnum.NODE_ADD, (node: XNodeDef): void => {
             const catalogElement: XNodeFactory = catalog.get(node.type);
 
             if (catalogElement) {
@@ -163,6 +177,19 @@ export default class XDiagram {
                     actionDispatcher(HookActionEnum.NODE_INSTALLED, xNode);
                 }
             }
+        });*/
+
+        actionListener(HookActionEnum.ELEMENT_ADD, (node: XElementDef): void => {
+
+            const catalogElement: XElementFactory = catalog.get(node.solver);
+            if (catalogElement) {
+                const xNode = catalogElement.build(context, node);
+
+                if (xNode) {
+                    context.addElement(xNode);
+                    actionDispatcher(HookActionEnum.ELEMENT_INSTALLED, xNode);
+                }
+            }
         });
 
         actionListener(HookActionEnum.DIAGRAM_DESTROY, () => builder.destroy());
@@ -171,17 +198,23 @@ export default class XDiagram {
         this.dispatcher = dispatcher;
     }
 
-    getHookListener(): HookListener {
+    getListener(): HookListener {
         return this.listener;
     }
 
-    addNode(node: XNodeDef): void {
-        this.dispatcher.action(HookActionEnum.NODE_ADD, node);
+    addElement(node: XElementDef): void {
+        isUndefined(node.id) && (node.id = idGen());
+        this.dispatcher.action(HookActionEnum.ELEMENT_ADD, node);
     }
 
-    addEdge(src: number, trg: number, data?: XData): void {
-        this.dispatcher.action(HookActionEnum.EDGE_ADD, src, trg, data);
-    }
+    /*
+        addNode(node: XNodeDef): void {
+            this.dispatcher.action(HookActionEnum.NODE_ADD, node);
+        }
+
+        addEdge(src: number, trg: number, data?: XData): void {
+            this.dispatcher.action(HookActionEnum.EDGE_ADD, src, trg, data);
+        }*/
 
     destroy(): void {
         this.dispatcher.action(HookActionEnum.DIAGRAM_DESTROY);
