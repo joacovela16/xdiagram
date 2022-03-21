@@ -5,10 +5,8 @@ import XInteractivePlugin from "../lib/plugins/XInteractivePlugin";
 import XLinkerPlugin from "../lib/plugins/XLinkerPlugin";
 import XSelectionPlugin from "../lib/plugins/XSelectionPlugin";
 import XToolBuilder from "../lib/plugins/XToolBuilder";
-import XElementPlugin from "../lib/plugins/XElementPlugin";
 
 export {
-    XElementPlugin,
     XBoardPlugin,
     XDataChangePlugin,
     XCopyPlugin,

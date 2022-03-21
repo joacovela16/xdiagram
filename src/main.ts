@@ -1,11 +1,8 @@
-import XDiagram from "./lib/XDiagram";
-import {XBoardPlugin, XCopyPlugin, XDataChangePlugin, XDeletePlugin, XElementPlugin, XInteractivePlugin, XLinkerPlugin, XSelectionPlugin} from "./modules/plugins";
-import type {XElementDef} from "./modules/core";
-import {XLightTheme} from "./lib/themes/XThemes";
-import PaperRenderer from "./lib/renderer/PaperRenderer";
-import XArrow from "./lib/components/XArrow";
-import XDefaultNode from "./lib/components/XDefaultNode";
-import {XNodePort} from "./modules/components";
+import {XLightTheme} from "./modules/themes";
+import {PaperRenderer} from "./modules/renderers";
+import {XArrow, XDefaultNode, XNodePort} from "./modules/components";
+import {XBoardPlugin, XCopyPlugin, XDataChangePlugin, XDeletePlugin, XInteractivePlugin, XLinkerPlugin, XSelectionPlugin} from "./modules/plugins";
+import {XElementDef, XDiagram} from "./modules/core";
 
 document.body.style.width = '100%';
 document.body.style.height = '400px';
@@ -20,7 +17,6 @@ const xDiagram = new XDiagram(document.body, {
         XArrow
     ],
     plugins: [
-        XElementPlugin,
         XBoardPlugin,
         XSelectionPlugin,
         XLinkerPlugin(),

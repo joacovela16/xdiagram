@@ -5,12 +5,10 @@ import {PathHelper} from "../shared/XRender";
 import {Command, HookActionEnum, HookFilterEnum} from "../shared/Instructions";
 import {LinkedList} from "../shared/XList";
 import XToolBuilder from "./XToolBuilder";
-import {definePlugin} from "../shared/XHelper";
 
-export const X_ARROW_CONFIG_MAPPER_EVENT = 'x-arrow-config-mapper';
 
-function BUTTON_PLUGIN(solver: string): XPluginDef {
-    return XToolBuilder('x-linker-button-plugin', context => {
+export default function XLinkerPlugin(solver: string = "x-arrow"): XPluginDef {
+    return XToolBuilder('x-linker-plugin', context => {
 
         const b = context.builder;
         const theme = context.theme;
@@ -131,89 +129,3 @@ function BUTTON_PLUGIN(solver: string): XPluginDef {
     });
 }
 
-export default function XLinkerPlugin(solver: string = "x-arrow"): XPluginDef {
-    // const factory: XEdgeFactory = arrowFactory;
-
-    return definePlugin({
-        name: 'x-linker-plugin',
-        plugin(ctx, hook) {
-
-            // const factory = ctx.options.catalog.find(x => x.name === solver);
-            // if (isUndefined(factory)) return;
-
-            // const actionListener = hook.listener.action;
-            // const dispatcher = hook.dispatcher;
-
-            ctx.activePlugin(BUTTON_PLUGIN(solver));
-
-            /*actionListener(HookActionEnum.ELEMENT_ADD, (cfg: XElementDef) => {
-                const src: number = cfg.src;
-                const trg: number = cfg.trg;
-
-                if (!cfg.linkable && isDefined(src) && isDefined(trg)) {
-
-                    ctx.getElement(src).foreach(srcElem => {
-                        ctx.getElement(trg).foreach(trgElem => {
-
-                            const points = getMinDistance(srcElem.bounds, trgElem.bounds);
-                            const finalPoints = dispatcher.filter(HookFilterEnum.EDGE_OBTAIN_EXTREMES, points);
-
-                            if (finalPoints.length === 2) {
-                                const x = finalPoints[0];
-                                const y = finalPoints[1];
-
-                                cfg.stages = [{x: x.y, y: x.y}, {x: y.y, y: y.y}];
-
-                                const finalCfg: XElementDef = dispatcher.filter(X_ARROW_CONFIG_MAPPER_EVENT, cfg);
-                                const arrow = factory.build(ctx, finalCfg);
-                                ctx.addElement(arrow);
-                                // dispatcher.action(HookActionEnum.EDGE_INSTALLED, arrow);
-                                dispatcher.action(HookActionEnum.DATA_UPDATE);
-                            }
-
-                        });
-                    });
-                }
-            });*/
-            /*actionListener(HookActionEnum.EDGE_ADD, (src: XID, trg: XID, data?: XData): void => {
-
-                ctx.getNode(src).foreach(srcState => {
-                    ctx.getNode(trg).foreach(trgState => {
-                        const srcElem = srcState.element;
-                        const trgElem = trgState.element;
-
-                        const srcID = srcElem.id;
-                        const trgID = trgElem.id;
-
-                        const points = getMinDistance(srcElem.bounds, trgElem.bounds);
-                        const finalPoints = dispatcher.filter(HookFilterEnum.EDGE_OBTAIN_EXTREMES, points);
-
-                        if (finalPoints.length === 2) {
-                            const x = finalPoints[0];
-                            const y = finalPoints[1];
-                            const edgeDef: XEdgeDef = {
-                                id: idGen(),
-                                src: srcID,
-                                trg: trgID,
-                                stages: [{x: x.y, y: x.y}, {x: y.y, y: y.y},],
-                                ...data
-                            };
-
-                            const finalCfg: XEdgeDef = dispatcher.filter(X_ARROW_CONFIG_MAPPER_EVENT, edgeDef);
-                            const arrow = factory.build(ctx, finalCfg);
-                            const arrowState: XArrowState = {id: edgeDef.id, src, trg, element: arrow};
-
-                            if (ctx.addLink(arrowState)) {
-                                dispatcher.action(HookActionEnum.EDGE_INSTALLED, arrow);
-                                dispatcher.action(HookActionEnum.DATA_UPDATE);
-                            } else {
-                                arrow.remove();
-                            }
-                        }
-                    });
-                });
-            });*/
-
-        }
-    });
-}

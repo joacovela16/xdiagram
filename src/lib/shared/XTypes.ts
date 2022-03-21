@@ -8,7 +8,6 @@ export type XID = number;
 
 export type Holder<T> = { state: T, ref: Record<T> };
 
-
 export type XData = { [index: string]: any };
 
 type XElementBase = {
@@ -29,20 +28,6 @@ export type XDiagramOptions = {
 export type HookAction = HookActionEnum | string;
 
 export type HookFilter = HookFilterEnum | string;
-
-export type XArrowState = {
-    id: XID,
-    element: XNode;
-    src?: number;
-    trg?: number;
-};
-
-
-export type XNodeState = {
-    element: XNode;
-    in: LinkedList<XArrowState>;
-    out: LinkedList<XArrowState>;
-};
 
 export type Callable = () => void;
 
@@ -78,15 +63,6 @@ export interface XElementFactory<T = XElementDef> {
     onDestroy?: (context: XContext) => void;
     build: (context: XContext, config: T) => XNode;
 }
-
-/*
-export interface XEdgeFactory {
-    name: string;
-    description?: string;
-
-    build(context: XContext, config: XElementDef): XNode;
-}
-*/
 
 export interface XContext {
     builder: XBuilder;
