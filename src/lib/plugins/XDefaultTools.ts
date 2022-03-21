@@ -5,6 +5,7 @@ import XToolBuilder from "./XToolBuilder";
 import {idGen} from "../shared/XLib";
 
 const PREPARE_NODE_COPY: string = 'on-prepare-node-copy';
+
 export const XCopyPlugin = XToolBuilder('x-copy-plugin', (context, hook) => {
     const filterDispatcher = hook.dispatcher.filter;
     return {
@@ -25,7 +26,7 @@ export const XCopyPlugin = XToolBuilder('x-copy-plugin', (context, hook) => {
                 clone.id = idGen();
                 const finalData = filterDispatcher(PREPARE_NODE_COPY, clone);
 
-                hook.dispatcher.action(HookActionEnum.NODE_ADD, finalData);
+                hook.dispatcher.action(HookActionEnum.ELEMENT_ADD, finalData);
             }
         },
         getPosition(bound: XBound): XPoint {
@@ -46,7 +47,7 @@ export const XCopyPlugin = XToolBuilder('x-copy-plugin', (context, hook) => {
     }
 });
 
-export const XDeletePlugin = XToolBuilder('x-element-delete', () => {
+export const XDeletePlugin = XToolBuilder('x-element-delete', (context, hook) => {
     return {
         selectEvents: [HookActionEnum.ELEMENT_SELECTED],
         unselectEvents: [HookActionEnum.ELEMENT_START_DRAG, HookActionEnum.BOARD_CLICK, HookActionEnum.ELEMENT_DELETED],
@@ -72,6 +73,7 @@ export const XDeletePlugin = XToolBuilder('x-element-delete', () => {
         },
         onClick(node: XNode): void {
             node.command(Command.remove);
+            hook.dispatcher.action(`${node.id}-deleted`);
         }
     }
 });

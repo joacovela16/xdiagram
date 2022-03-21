@@ -6,7 +6,7 @@ import type {XNode} from "../shared/XRender";
 const XElementPlugin = definePlugin({
     name: 'x-element-plugin',
     plugin: (context, hook) => {
-        const actionListener = hook.listener.action;
+        // const actionListener = hook.listener.action;
         const actionDispatcher = hook.dispatcher.action;
 
         // actionDispatcher(HookActionEnum.NODE_INSTALLED, doCreate);

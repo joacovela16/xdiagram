@@ -15,12 +15,16 @@ export default function XDataChangePlugin() {
 
             const timer = new Timer(300);
 
-            actionListener(HookActionEnum.DATA_UPDATE, () => {
+            const handler = () => {
                 if (hook.hasListeners(X_ON_DATA_CHANGE_EVENT)) {
                     timer.clear();
                     timer.handle(prepareData);
                 }
-            });
+            };
+
+            actionListener(HookActionEnum.ELEMENT_DELETED, handler);
+            actionListener(HookActionEnum.ELEMENT_INSTALLED, handler);
+            actionListener(HookActionEnum.ELEMENT_END_DRAG, handler);
 
             function prepareData() {
                 const data = context.getElements().map(x => x.data).toArray()

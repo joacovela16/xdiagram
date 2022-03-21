@@ -1,5 +1,5 @@
 import type {Callable, XElementDef, XPluginDef} from "../shared/XTypes";
-import {getMinDistance, isDefined, isUndefined, Timer} from "../shared/XLib";
+import {Timer} from "../shared/XLib";
 import type {XBound, XItem, XNode, XPoint} from "../shared/XRender";
 import {PathHelper} from "../shared/XRender";
 import {Command, HookActionEnum, HookFilterEnum} from "../shared/Instructions";
@@ -7,7 +7,7 @@ import {LinkedList} from "../shared/XList";
 import XToolBuilder from "./XToolBuilder";
 import {definePlugin} from "../shared/XHelper";
 
-const X_ARROW_CONFIG_MAPPER_EVENT = 'x-arrow-config-mapper';
+export const X_ARROW_CONFIG_MAPPER_EVENT = 'x-arrow-config-mapper';
 
 function BUTTON_PLUGIN(solver: string): XPluginDef {
     return XToolBuilder('x-linker-button-plugin', context => {
@@ -138,11 +138,11 @@ export default function XLinkerPlugin(solver: string = "x-arrow"): XPluginDef {
         name: 'x-linker-plugin',
         plugin(ctx, hook) {
 
-            const factory = ctx.options.catalog.find(x => x.name === solver);
-            if (isUndefined(factory)) return;
+            // const factory = ctx.options.catalog.find(x => x.name === solver);
+            // if (isUndefined(factory)) return;
 
-            const actionListener = hook.listener.action;
-            const dispatcher = hook.dispatcher;
+            // const actionListener = hook.listener.action;
+            // const dispatcher = hook.dispatcher;
 
             ctx.activePlugin(BUTTON_PLUGIN(solver));
 

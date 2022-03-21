@@ -1,4 +1,4 @@
-import {asMap, doHookBuilder, idGen, isUndefined} from "./shared/XLib";
+import {asMap, doHookBuilder, idGen, isDefined, isUndefined} from "./shared/XLib";
 import {LinkedList} from "./shared/XList";
 import type {Holder, HookDispatcher, HookListener, HookManager, XContext, XDiagramOptions, XElementFactory, XID, XPluginDef, XTheme} from "./shared/XTypes";
 import {XElementDef} from "./shared/XTypes";
@@ -29,7 +29,6 @@ export default class XDiagram {
         const dispatcher: HookDispatcher = hookManager.dispatcher;
         const listener: HookListener = hookManager.listener;
         const actionListener = listener.action;
-        const filterDispatcher = dispatcher.filter;
         const actionDispatcher = dispatcher.action;
 
         const context: XContext = {
@@ -55,144 +54,42 @@ export default class XDiagram {
                 });
             },
             addElement(node: XNode) {
-                const ref = elementListStore.append(node)
-                elementMapStore.set(node.id, {state: node, ref});
+                if (isDefined(node.id)) {
+                    const ref = elementListStore.append(node)
+                    elementMapStore.set(node.id, {state: node, ref});
+                }
             },
             getElement(id: XID): Option<XNode> {
                 return doOption(elementMapStore.get(id)).map(x => x.state);
             }
-            /*existsNode(id: XID): boolean {
-                return nodeMapStore.has(id);
-            },
-            existsLink(id: XID): boolean {
-                return linkMapStore.has(id);
-            },
-            getNodes(): LinkedList<XNodeState> {
-                return nodeListStore;
-            },
-            getNode(id: XID): Option<XNodeState> {
-                return doOption(nodeMapStore.get(id)).map(x => x.state);
-            },
-            removeNode(id: XID): boolean {
-                return doOption(nodeMapStore.get(id))
-                    .exists(node => {
-
-                        const state = node.state;
-
-                        if (filterDispatcher(HookFilterEnum.NODE_CAN_REMOVE, true, state.element)) {
-                            state.out.forEach(x => x.element.command(Command.remove));
-                            state.in.forEach(x => x.element.command(Command.remove));
-                            state.in.clean();
-                            state.out.clean();
-                            node.ref.remove();
-                            actionDispatcher(HookActionEnum.DATA_UPDATE);
-                            return true;
-                        }
-
-                        return false;
-                    });
-            },
-            getLink(id: XID): Option<XArrowState> {
-                return doOption(linkMapStore.get(id)).map(x => x.state);
-            },
-            removeLink(id: XID, full?: boolean): boolean {
-
-                return doOption(linkMapStore.get(id))
-                    .exists(link => {
-                        const state = link.state;
-                        const src = state.src;
-                        const trg = state.trg;
-
-                        if (isUndefined(full) || full) {
-                            isDefined(src) && doOption(nodeMapStore.get(src)).map(x => x.state).foreach(x => x.out.findAndRemove(y => y.id === id));
-                            isDefined(trg) && doOption(nodeMapStore.get(trg)).map(x => x.state).foreach(x => x.in.findAndRemove(y => y.id === id));
-                        }
-
-                        link.ref.remove();
-                        linkMapStore.delete(id);
-                        actionDispatcher(HookActionEnum.DATA_UPDATE);
-                        return true;
-                    });
-            },
-            addLink(arrowState: XArrowState): boolean {
-
-                const id = arrowState.id;
-                const srcDefined = doOption(nodeMapStore.get(arrowState.src))
-                    .map(x => x.state.out)
-                    .filter(outer => !outer.exists(x => x.id === id))
-                    .exists(outer => {
-                        outer.append(arrowState);
-                        return true;
-                    });
-                const trgDefined = doOption(nodeMapStore.get(arrowState.trg))
-                    .map(x => x.state.in)
-                    .filter(inner => !inner.exists(x => x.id === id))
-                    .exists(inner => {
-                        inner.append(arrowState);
-                        return true;
-                    });
-                const result: boolean = srcDefined || trgDefined;
-
-                doOption(linkMapStore.get(id))
-                    .filter(() => srcDefined && trgDefined) // both must be defined
-                    .fold(link => {
-                            link.state.src = getOrElse(link.state.src, arrowState.src);
-                            link.state.trg = getOrElse(link.state.trg, arrowState.trg);
-                        },
-                        () => {
-                            const ref = linkListStore.append(arrowState);
-                            linkMapStore.set(id, {ref, state: arrowState});
-                        });
-
-                return result;
-            },
-            addNode(state: XNodeState): boolean {
-                const key = state.element.id;
-
-                if (nodeMapStore.has(key)) return false;
-                const ref = nodeListStore.append(state);
-                nodeMapStore.set(key, {state, ref});
-
-                return true;
-            },
-            getLinks(): LinkedList<XArrowState> {
-                return linkListStore;
-            }*/
         };
         actionDispatcher(HookActionEnum.BEFORE_START);
 
+        options.catalog.forEach(x => x.onInit && x.onInit(context));
         options.plugins.forEach(x => x.plugin(context, hookManager));
-
-        /*actionListener(HookActionEnum.NODE_ADD, (node: XNodeDef): void => {
-            const catalogElement: XNodeFactory = catalog.get(node.type);
-
-            if (catalogElement) {
-                const xNode = catalogElement.build(context, node);
-                if (xNode) {
-                    const state: XNodeState = {element: xNode, out: new LinkedList<XArrowState>(), in: new LinkedList()};
-
-                    const ref = nodeListStore.append(state);
-                    nodeMapStore.set(node.id, {state, ref});
-
-                    actionDispatcher(HookActionEnum.NODE_INSTALLED, xNode);
-                }
-            }
-        });*/
 
         actionListener(HookActionEnum.ELEMENT_ADD, (node: XElementDef): void => {
 
             const catalogElement: XElementFactory = catalog.get(node.solver);
             if (catalogElement) {
+                const localID = idGen();
+                isUndefined(node.id) && (node.id = localID);
+
                 const xNode = catalogElement.build(context, node);
 
                 if (xNode) {
+                    isUndefined(xNode.id) && (xNode.id = localID);
                     context.addElement(xNode);
                     actionDispatcher(HookActionEnum.ELEMENT_INSTALLED, xNode);
                 }
             }
         });
 
-        actionListener(HookActionEnum.DIAGRAM_DESTROY, () => builder.destroy());
+        actionListener(HookActionEnum.DIAGRAM_DESTROY, () => {
+            builder.destroy();
+            options.catalog.forEach(x => x.onDestroy && x.onDestroy(context));
+        });
+
         actionDispatcher(HookActionEnum.AFTER_START);
         this.listener = listener;
         this.dispatcher = dispatcher;
@@ -203,7 +100,6 @@ export default class XDiagram {
     }
 
     addElement(node: XElementDef): void {
-        isUndefined(node.id) && (node.id = idGen());
         this.dispatcher.action(HookActionEnum.ELEMENT_ADD, node);
     }
 

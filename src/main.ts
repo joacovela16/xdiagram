@@ -1,6 +1,6 @@
 import XDiagram from "./lib/XDiagram";
 import {XBoardPlugin, XCopyPlugin, XDataChangePlugin, XDeletePlugin, XElementPlugin, XInteractivePlugin, XLinkerPlugin, XSelectionPlugin} from "./modules/plugins";
-import type {XEdgeDef, XNode, XNodeDef} from "./modules/core";
+import type {XElementDef} from "./modules/core";
 import {XLightTheme} from "./lib/themes/XThemes";
 import PaperRenderer from "./lib/renderer/PaperRenderer";
 import XArrow from "./lib/components/XArrow";
@@ -14,8 +14,6 @@ const xDiagram = new XDiagram(document.body, {
     id: 'test',
     theme: XLightTheme,
     renderer: PaperRenderer,
-    edges: [],
-    nodes: [],
     catalog: [
         XDefaultNode({name: 'rounded-node', strokeWidth: 2, padding: 24, radius: 8}),
         XNodePort({name: 'port', strokeWidth: 2, padding: 24, radius: 8}),
@@ -33,25 +31,20 @@ const xDiagram = new XDiagram(document.body, {
     ]
 });
 
-// xDiagram.getHookListener().filter(HookFilterEnum.NODES_CAN_LINK, () => false);
-
 xDiagram.getListener().action('x-on-data-change', data => {
     console.log(data)
 });
 
-xDiagram.getListener().action('x-arrow-config-mapper', (cfg: XEdgeDef) => {
+xDiagram.getListener().action('x-arrow-config-mapper', (cfg: XElementDef) => {
     cfg.targetPointer = true;
     return cfg;
 });
 
-xDiagram.getListener().filter('on-prepare-node-copy', (cfg: XNodeDef) => {
+xDiagram.getListener().filter('on-prepare-node-copy', (cfg: XElementDef) => {
     cfg.text = `${cfg.text}-copy`;
     return cfg;
 });
 
-xDiagram.getListener().filter('x-linker-button-plugin-can-apply', (value:boolean, node:XNode)=> {
-    return node.data.type !== 'port';
-})
 
 xDiagram.addElement({
     id: 0,
@@ -83,28 +76,6 @@ xDiagram.addElement({
     }
 });
 
-
-/*
-xDiagram.addElement({
-    id: 3,
-    type: 'port',
-    text: 'Port 1',
-    inNumber: 2,
-    outNumber: 1,
-    position: {
-        x: 400,
-        y: 200,
-    }
-});
-*/
-/*
-
-xDiagram.addElement({
-    solver: 'x-arrow',
-    src: 0,
-    trg: 1,
-});
-*/
 xDiagram.addElement({
     solver: 'x-arrow',
     src: 2,

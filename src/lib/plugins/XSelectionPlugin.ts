@@ -16,7 +16,7 @@ const XSelectionPlugin: XPluginDef = definePlugin({
         actionListener(HookActionEnum.ELEMENT_SELECTED, showBox);
         actionListener(HookActionEnum.ELEMENT_START_DRAG, hideBox);
         actionListener(HookActionEnum.BOARD_CLICK, hideBox);
-        actionListener(HookActionEnum.ELEMENT_DELETED, () => hideBox());
+        actionListener(HookActionEnum.ELEMENT_DELETED,  hideBox);
 
         function doBounder() {
             let shape: XNode;

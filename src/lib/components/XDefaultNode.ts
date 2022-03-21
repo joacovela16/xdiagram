@@ -20,7 +20,7 @@ interface XNodeRectDef {
 export default function XDefaultNode(conf: XNodeRectDef): XElementFactory {
     return defineElement({
         name: conf.name,
-        handler: function (context: XContext, cfg: XElementDef): XNode {
+        build (context: XContext, cfg: XElementDef): XNode {
             const config: XElementDef = {...cfg, ...conf};
             const position = config.position;
             const b: XBuilder = context.builder;
@@ -65,7 +65,7 @@ export default function XDefaultNode(conf: XNodeRectDef): XElementFactory {
                         if (filterDispatcher(HookFilterEnum.NODE_CAN_REMOVE, true, rootEl) ) {
                             context.removeElement(config.id);
                             rootEl.remove();
-                            actionDispatcher(HookActionEnum.ELEMENT_DELETED, config);
+                            actionDispatcher(HookActionEnum.ELEMENT_DELETED, rootEl);
                         }
                     }
                 }

@@ -11,9 +11,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "decl": "tsc -t es5 --emitDeclarationOnly --declaration --outDir ./dist/types ./src/modules/core.ts ./src/modules/plugins.ts ./src/modules/themes.ts ./src/modules/components.ts ./src/modules/renderers.ts",
-    "clean": "rimraf components && rimraf plugins && rimraf themes&& rimraf dist && rimraf index.d.ts",
-    "prepublish": "npm run build",
-    "postpublish": "npm run clean"
+    "clean": "rimraf components && rimraf plugins && rimraf themes&& rimraf dist && rimraf index.d.ts"
   },
   "dependencies": {
     "paper": "0.12.15"

@@ -45,6 +45,8 @@ export default function XToolBuilder(name: string, handler: (context: XContext, 
                 if (filterDispatcher(`${name}-can-apply`, true, node)) {
                     focus(node);
                     spec.onSelect && spec.onSelect(node);
+                }else{
+                    unselectAll();
                 }
             }
 

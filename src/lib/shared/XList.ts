@@ -5,6 +5,7 @@ export class Record<T> {
     previous: Record<T>
     data: T;
     next: Record<T>;
+    private active: boolean = true;
     private belongTo: LinkedList<T>;
 
     constructor(previous: Record<T>, data: T, next: Record<T>, belongTo: LinkedList<T>) {
@@ -15,7 +16,14 @@ export class Record<T> {
     }
 
     remove(): void {
-        this.belongTo.remove(this);
+        if (this.active) {
+            this.active = false;
+            this.belongTo.remove(this);
+        }
+    }
+    getAndRemove(f: (x: T) =>void): void{
+        f(this.data);
+        this.remove();
     }
 }
 
@@ -129,7 +137,7 @@ export class LinkedList<T> {
         return result;
     }
 
-    filter(f: (x:T) => boolean): LinkedList<T>{
+    filter(f: (x: T) => boolean): LinkedList<T> {
         const result = new LinkedList<T>();
         this.forEach(x => f(x) && result.append(x));
         return result;

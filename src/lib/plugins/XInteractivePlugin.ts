@@ -64,9 +64,7 @@ const XInteractivePlugin: XPluginDef = definePlugin({
                 listeners.push(
                     node.on('mousedrag', (event: XEvent): void => {
                         node.moveTo(doSnap(event.point));
-                        // fixme
-                        // state.in.forEach(x => x.element.command(Command.nodeDrag));
-                        // state.out.forEach(x => x.element.command(Command.nodeDrag));
+                        actionDispatcher(`${node.id}-drag`, node);
                     })
                 );
             }

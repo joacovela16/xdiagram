@@ -1,10 +1,12 @@
 import {cutSegment, doHover, doReceptor, doSnap, getOrElse, isUndefined, Timer} from "../shared/XLib";
-import type {XContext, XEdgeDef, XElementDef, XElementFactory, XID, XTheme} from "../shared/XTypes";
+import type {XContext, XElementDef, XElementFactory, XID, XTheme} from "../shared/XTypes";
+import {Callable} from "../shared/XTypes";
 import {defineElement} from "../shared/XHelper";
 import type {XBuilder, XItem, XNode, XPoint} from "../shared/XRender";
 import {PathHelper} from "../shared/XRender";
 import {Command, HookActionEnum, HookFilterEnum} from "../shared/Instructions";
 import doReactive from "../shared/Reactive";
+import {LinkedList, Record} from "../shared/XList";
 
 interface XDraw {
     draw(): void;
@@ -24,17 +26,6 @@ interface ArrowExtreme extends XDraw {
     element: XNode;
 }
 
-interface ArrowExtremeConf {
-    fill?: string;
-    shape: 'triangle' | 'circle';
-}
-
-interface ArrowConf extends XEdgeDef {
-    dashArray?: [number, number];
-    sourcePointer?: boolean | ArrowExtremeConf;
-    targetPointer?: boolean | ArrowExtremeConf;
-}
-
 type Coord = { x: number; y: number };
 
 function isZero(n: number, epsilon: number = 0.05) {
@@ -43,7 +34,12 @@ function isZero(n: number, epsilon: number = 0.05) {
 
 const XArrow: XElementFactory = defineElement({
     name: 'x-arrow',
-    handler: function (context: XContext, config: XElementDef): XNode {
+    onInit(context) {
+        let listener = context.hookManager.listener;
+        listener.filter("x-linker-button-plugin-can-apply", (value: boolean, node: XNode) => node.data.solver !== 'x-arrow');
+        listener.filter("x-copy-plugin-can-apply", (value: boolean, node: XNode) => node.data.solver !== 'x-arrow');
+    },
+    build(context: XContext, config: XElementDef): XNode {
 
         const ID: XID = config.id;
         const b: XBuilder = context.builder;
@@ -67,33 +63,27 @@ const XArrow: XElementFactory = defineElement({
 
         // install components
         const theme: XTheme = context.theme;
-        const actionDispatcher = context.hookManager.dispatcher.action;
-        const filterDispatcher = context.hookManager.dispatcher.filter;
+        const hookManager = context.hookManager;
+        const actionDispatcher = hookManager.dispatcher.action;
+        const filterDispatcher = hookManager.dispatcher.filter;
+        const actionListener = hookManager.listener.action;
         const confReactive = doReactive<XElementDef>(config);
 
         actionDispatcher('x-arrow-config-mapper', config);
 
+        const onRemoveCallable: LinkedList<Callable> = new LinkedList<Callable>();
         const dragTimer = new Timer(300);
         const stages: XStage[] = []
         const tools: XDraw[] = []
         const path = b.makePath();
+
         const command = doReceptor(
             {
                 [Command.unfocused]() {
                     !isDraggingMode && hideAll();
                 },
-                [Command.nodeDrag]() {
-                    updatePositions();
-                    dragTimer.clear();
-                    dragTimer.handle(() => updateData());
-                },
                 [Command.remove]() {
-                    if (filterDispatcher(HookFilterEnum.EDGE_CAN_REMOVE, true, rootEl)) {
-                        context.removeElement(ID);
-                        rootEl.remove();
-                        actionDispatcher(HookActionEnum.ELEMENT_DELETED, config);
-                        confReactive.clean();
-                    }
+                    removeThis();
                 },
                 [Command.config](cfg: XElementDef) {
                     confReactive.set(cfg);
@@ -113,25 +103,28 @@ const XArrow: XElementFactory = defineElement({
         let nodeSetter: (n: XItem) => void;
         let srcRefNode: XNode, trgRefNode: XNode;
 
-        context.getElement(config.src).foreach(x => {
-            srcRefNode = x;
-            isUndefined(stages[0]) && stages.push({index: 0, point: x.bounds.center});
 
-        });
-        context.getElement(config.trg).foreach(x => {
-            trgRefNode = x;
-            isUndefined(stages[1]) && stages.push({index: 1, point: x.bounds.center});
-        });
 
-        for (let i = 0; i < stagesCount; i++) {
-            const datum = initialStages[i];
-            stages[i] = {index: i, point: b.makePoint(datum.x, datum.y)};
+        if (initialStages.length > 1) {
+            for (let i = 0; i < stagesCount; i++) {
+                const datum = initialStages[i];
+                stages[i] = {index: i, point: b.makePoint(datum.x, datum.y)};
+            }
+        }else{
+            context.getElement(config.src).foreach(x => {
+                srcRefNode = x;
+                isUndefined(stages[0]) && stages.push({index: 0, point: x.bounds.center});
+
+            });
+            context.getElement(config.trg).foreach(x => {
+                trgRefNode = x;
+                isUndefined(stages[1]) && stages.push({index: 1, point: x.bounds.center});
+            });
         }
 
+        stagesCount = stages.length;
         path.strokeColor = theme.accent;
         path.strokeWidth = 3;
-
-        stagesCount = 2;
 
         buildArrowTool(stages[0]);
         buildArrowTool(stages[1]);
@@ -193,6 +186,15 @@ const XArrow: XElementFactory = defineElement({
 
         updatePositions();
 
+        function removeThis() {
+            context.removeElement(ID);
+            rootEl.remove();
+            confReactive.clean();
+            onRemoveCallable.forEach(x => x());
+            onRemoveCallable.clean();
+            actionDispatcher(HookActionEnum.ELEMENT_DELETED, rootEl);
+        }
+
         function hideAll() {
             isSelectionMode = false;
             setToolsVisible();
@@ -241,7 +243,6 @@ const XArrow: XElementFactory = defineElement({
             circle.on('mousedown', () => {
                 timer.handle(() => {
                     isDraggingMode = true;
-                    // actionDispatcher(HookActionEnum.EDGE_START_DRAG, rootEl);
                     actionDispatcher(HookActionEnum.ELEMENT_START_DRAG, rootEl);
                 });
             });
@@ -250,7 +251,6 @@ const XArrow: XElementFactory = defineElement({
                         isDraggingMode && (isDraggingMode = false);
                         isSelectionMode = true;
                         setToolsVisible(true);
-                        // actionDispatcher(HookActionEnum.EDGE_END_DRAG, rootEl);
                         actionDispatcher(HookActionEnum.ELEMENT_END_DRAG, rootEl);
                         updateData();
                     });
@@ -263,6 +263,7 @@ const XArrow: XElementFactory = defineElement({
                 },
                 () => {
                     htmlElement.style.cursor = 'default';
+                    hideAll();
                 });
 
             circle.on('doubleclick', () => {
@@ -440,6 +441,8 @@ const XArrow: XElementFactory = defineElement({
                 secondaryArrow.setPosition(start, end.add(end.subtract(start).normalize(8)));
             };
 
+            context.getElement(nodeIDBound).foreach(x => setter(x))
+
             secondaryEl.on('mousedrag', (event) => {
                 if (isDraggingMode) {
 
@@ -480,25 +483,18 @@ const XArrow: XElementFactory = defineElement({
                 }
             });
 
-            secondaryEl.on('mousedown', e => {
-                context
-                    .getElement(nodeIDBound)
-                    .foreach(node => {
-                        if (isSource) {
-                            srcRefNode = null;
-                            config.src = undefined;
-                            //node.out.findAndRemove(x => x.id === ID && x.src === nodeIDBound);
-                        } else {
-                            trgRefNode = null;
-                            config.trg = undefined;
-                            //node.in.findAndRemove(x => x.id === ID && x.trg === nodeIDBound);
-                        }
-                        //context.removeLink(ID, false);
-                        nodeSetter = setter;
-                        isDraggingMode = true;
-                        actionDispatcher(HookActionEnum.ELEMENT_START_DRAG, rootEl);
-                        // actionDispatcher(HookActionEnum.EDGE_START_DRAG, rootEl);
-                    });
+            secondaryEl.on('mousedown', () => {
+                if (isSource) {
+                    srcRefNode = null;
+                    config.src = undefined;
+                } else {
+                    trgRefNode = null;
+                    config.trg = undefined;
+                }
+                setter(null);
+                nodeSetter = setter;
+                isDraggingMode = true;
+                actionDispatcher(HookActionEnum.ELEMENT_START_DRAG, rootEl);
             });
 
             secondaryEl.on('mouseup', () => {
@@ -511,25 +507,8 @@ const XArrow: XElementFactory = defineElement({
                     updateData();
                     nodeSelection.command(Command.onNodeNormal);
                     nodeSelection = null;
-
-                    /*context.getLink(ID).fold(
-                        (link) => {
-                            link.src = srcRefNode && srcRefNode.id;
-                            link.trg = trgRefNode && trgRefNode.id;
-                        },
-                        () => {
-                            context.addLink({
-                                id: ID,
-                                element: rootEl,
-                                src: srcRefNode && srcRefNode.id,
-                                trg: trgRefNode && trgRefNode.id
-                            });
-                        }
-                    )*/
-
                 }
                 nodeSetter = null;
-                // actionDispatcher(HookActionEnum.EDGE_END_DRAG, rootEl);
                 actionDispatcher(HookActionEnum.ELEMENT_END_DRAG, rootEl);
             });
             secondaryEl.on('mouseenter', () => htmlElement.style.cursor = 'pointer');
@@ -559,19 +538,51 @@ const XArrow: XElementFactory = defineElement({
             tools.push(item);
 
             function buildSetter() {
+                const dragImpl: Callable = () => {
+                    updatePositions();
+                    dragTimer.clear();
+                    dragTimer.handle(() => updateData());
+                };
+
+                const deleteImpl: Callable = () => removeThis();
+
+                let dragRecord: Record<Callable>,
+                    deleteRecord: Record<Callable>;
+
+                const clean: Callable = () => {
+                    dragRecord && dragRecord.getAndRemove(x => x());
+                    deleteRecord && deleteRecord.getAndRemove(x => x());
+                }
+
+                const installer: (x: XNode) => void = (node) => {
+                    dragRecord = onRemoveCallable.append(actionListener(`${node.id}-drag`, dragImpl));
+                    deleteRecord = onRemoveCallable.append(actionListener(`${node.id}-deleted`, deleteImpl));
+                }
+
                 if (isSource) {
                     return (node: XNode) => {
-                        // if (context.addLink({id: ID, element: rootEl, src: node.id})) {
                         srcRefNode = node;
-                        config.src = node.id;
-                        // }
+                        clean();
+
+                        if (node) {
+                            config.src = node.id;
+                            installer(node);
+                        } else {
+                            config.src = undefined;
+                        }
                     };
                 } else {
                     return (node: XNode) => {
-                        // if (context.addLink({id: ID, element: rootEl, trg: node.id})) {
                         trgRefNode = node;
-                        config.trg = node.id;
-                        // }
+
+                        clean();
+
+                        if (node) {
+                            config.trg = node.id;
+                            installer(node);
+                        } else {
+                            config.trg = undefined;
+                        }
                     };
                 }
             }

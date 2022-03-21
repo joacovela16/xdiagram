@@ -1,4 +1,4 @@
-import {XContext, XNodeDef, XElementFactory, XTheme} from "../shared/XTypes";
+import {XContext,  XElementFactory, XTheme, XElementDef} from "../shared/XTypes";
 import {defineElement} from "../shared/XHelper";
 import {XNode, XPoint} from "../shared/XRender";
 import {doLinkZone, doReceptor, getOrElse} from "../shared/XLib";
@@ -45,14 +45,13 @@ type XNodePortBase = {
     outStrikeWidth?: number;
 };
 
-type XNodePortConf = XNodePortBase & XNodeDef;
+type XNodePortConf = XNodePortBase & XElementDef;
 
-export default function XNodePort(cfg: XNodeBase): XElementFactory {
-
+export default function XNodePort(cfg: XNodeBase): XElementFactory<XNodePortConf> {
 
     return defineElement<XNodePortConf>({
         name: cfg.name,
-        handler(ctx: XContext, config: XNodePortConf): XNode {
+        build(ctx: XContext, config: XNodePortConf): XNode {
             const finalCfg: XNodePortConf = {...cfg, ...config};
             const b = ctx.builder;
             const hookManager = ctx.hookManager;
@@ -191,9 +190,10 @@ export default function XNodePort(cfg: XNodeBase): XElementFactory {
                         rectEl.strokeColor = theme.error;
                     },
                     [Command.remove]() {
-                        if (filterDispatcher(HookFilterEnum.NODE_CAN_REMOVE, true, rootEl) && ctx.removeNode(finalCfg.id)) {
+                        if (filterDispatcher(HookFilterEnum.NODE_CAN_REMOVE, true, rootEl) ) {
                             rootEl.remove();
-                            actionDispatcher(HookActionEnum.NODE_DELETED, finalCfg);
+                            ctx.removeElement(finalCfg.id)
+                            actionDispatcher(HookActionEnum.ELEMENT_DELETED, finalCfg);
                         }
                     }
                 }
