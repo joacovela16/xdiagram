@@ -36,12 +36,6 @@ xDiagram.getListener().action('x-arrow-config-mapper', (cfg: XElementDef) => {
     return cfg;
 });
 
-xDiagram.getListener().filter('on-prepare-node-copy', (cfg: XElementDef) => {
-    cfg.text = `${cfg.text}-copy`;
-    return cfg;
-});
-
-
 xDiagram.addElement({
     id: 0,
     solver: 'rounded-node',
@@ -70,6 +64,17 @@ xDiagram.addElement({
         x: 200,
         y: 200,
     }
+});
+xDiagram.addElement({
+    id: 3,
+    solver: 'port',
+    text: 'Task-3',
+    position: {
+        x: 500,
+        y: 200,
+    },
+    inNumber: 2,
+    outNumber: 1
 });
 
 xDiagram.addElement({

@@ -41,7 +41,7 @@ export default function XLinkerPlugin(solver: string = "x-arrow"): XPluginDef {
                     actionListener(HookActionEnum.LINK_ZONE_IN, (node: XNode) => {
                         if (isLinking && sourceNode && sourceNode.id !== node.id) {
                             targetNode = node;
-                            if (filterDispatcher(HookFilterEnum.NODES_CAN_LINK, sourceNode, targetNode)) {
+                            if (filterDispatcher(HookFilterEnum.NODES_CAN_LINK, true, sourceNode, targetNode)) {
                                 node.command(Command.onNodeFocus);
                                 line.strokeColor = theme.accent;
                             } else {

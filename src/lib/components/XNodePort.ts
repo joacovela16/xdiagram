@@ -1,8 +1,9 @@
-import {XContext,  XElementFactory, XTheme, XElementDef} from "../shared/XTypes";
+import {XContext, XElementDef, XElementFactory, XTheme} from "../shared/XTypes";
 import {defineElement} from "../shared/XHelper";
 import {XNode, XPoint} from "../shared/XRender";
 import {doLinkZone, doReceptor, getOrElse} from "../shared/XLib";
 import {Command, HookActionEnum, HookFilterEnum} from "../shared/Instructions";
+import {MAKE_INTERACTIVE} from "../plugins/XInteractivePlugin";
 
 type PortConf = {
     count: number;
@@ -16,6 +17,7 @@ type PortConf = {
     strokeColor: string;
     radius: number;
 };
+
 type XNodeBase = {
     name: string;
     description?: string;
@@ -32,13 +34,13 @@ type XNodePortBase = {
 
     orientation?: 'vertical' | 'horizontal';
 
-    // inNumber: number;
+    inNumber: number;
     inRadius?: number;
     inColor?: string;
     inStrokeColor?: string;
     inStrikeWidth?: number;
 
-    // outNumber: number;
+    outNumber: number;
     outRadius?: number;
     outColor?: string;
     outStrokeColor?: string;
@@ -51,6 +53,9 @@ export default function XNodePort(cfg: XNodeBase): XElementFactory<XNodePortConf
 
     return defineElement<XNodePortConf>({
         name: cfg.name,
+        onInit(ctx) {
+            ctx.hookManager.listener.filter('x-linker-plugin-can-apply', (_v,node) => node.data.solver !== cfg.name);
+        },
         build(ctx: XContext, config: XNodePortConf): XNode {
             const finalCfg: XNodePortConf = {...cfg, ...config};
             const b = ctx.builder;
@@ -73,9 +78,8 @@ export default function XNodePort(cfg: XNodeBase): XElementFactory<XNodePortConf
 
             const textPaperBounds = textEl.bounds.clone();
             textPaperBounds.width = textPaperBounds.width + padding;
-            textPaperBounds.height = textPaperBounds.width*0.75;
+            textPaperBounds.height = textPaperBounds.width * 0.75;
             textPaperBounds.center = textEl.bounds.center;
-
             const rectEl = b.makeRect(textPaperBounds, radius);
             const bounds = rectEl.bounds;
             bounds.center = textPaperBounds.center;
@@ -169,10 +173,31 @@ export default function XNodePort(cfg: XNodeBase): XElementFactory<XNodePortConf
                     circle.fillColor = datum.fill;
                     circle.strokeWidth = datum.strokeWidth;
                     circle.strokeColor = datum.strokeColor;
-                    portsElements.push(circle);
-                    doLinkZone(circle, ctx);
+
+
+                    const compound = b.makeCompound({
+                        items: [circle],
+                        command: doReceptor({
+                            [Command.onNodeFocus]() {
+                                circle.fillColor = theme.warning;
+                                console.log('>>>>')
+                            },
+                            [Command.onNodeNormal]() {
+                                circle.fillColor = datum.fill;
+                            },
+                            [Command.onNodeError]() {
+                                rectEl.fillColor = theme.error;
+                            },
+                        }),
+                        getIntersections(item: XNode): XPoint[] {
+                            return circle.getIntersections(item);
+                        }
+                    });
 
                     point = finalPt;
+                    portsElements.push(compound);
+                    doLinkZone(compound, ctx);
+                    ctx.addElement(compound);
                 }
             }
 
@@ -190,10 +215,10 @@ export default function XNodePort(cfg: XNodeBase): XElementFactory<XNodePortConf
                         rectEl.strokeColor = theme.error;
                     },
                     [Command.remove]() {
-                        if (filterDispatcher(HookFilterEnum.NODE_CAN_REMOVE, true, rootEl) ) {
+                        if (filterDispatcher(HookFilterEnum.NODE_CAN_REMOVE, true, rootEl)) {
                             rootEl.remove();
                             ctx.removeElement(finalCfg.id)
-                            actionDispatcher(HookActionEnum.ELEMENT_DELETED, finalCfg);
+                            actionDispatcher(HookActionEnum.ELEMENT_DELETED, rootEl);
                         }
                     }
                 }
@@ -207,11 +232,9 @@ export default function XNodePort(cfg: XNodeBase): XElementFactory<XNodePortConf
                 }
             });
 
-            rootEl.id = finalCfg.id;
             rootEl.data = finalCfg;
             ctx.frontLayer.addChild(rootEl);
-
-            //doLinkZone(rootEl, ctx);
+            actionDispatcher(MAKE_INTERACTIVE, rootEl);
 
             return rootEl;
         }

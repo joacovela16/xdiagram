@@ -54,6 +54,8 @@ export default class XDiagram {
                 });
             },
             addElement(node: XNode) {
+
+                isUndefined(node.id) && (node.id = idGen());
                 if (isDefined(node.id)) {
                     const ref = elementListStore.append(node)
                     elementMapStore.set(node.id, {state: node, ref});
