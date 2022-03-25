@@ -1,77 +1,26 @@
-import type {Callable, XElementDef, XPluginDef} from "../shared/XTypes";
-import {Timer} from "../shared/XLib";
-import type {XBound, XItem, XNode, XPoint} from "../shared/XRender";
-import {PathHelper} from "../shared/XRender";
-import {Command, HookActionEnum, HookFilterEnum} from "../shared/Instructions";
-import {LinkedList} from "../shared/XList";
-import XToolBuilder from "./XToolBuilder";
-
+import type {Callable, XPluginDef} from "../shared/XTypes";
+import {XIconTool} from "../shared/XTypes";
+import {doIconTool, doLinker} from "../shared/XLib";
+import type {XBound, XNode, XPoint} from "../shared/XRender";
+import {HookActionEnum} from "../shared/Instructions";
 
 export default function XLinkerPlugin(solver: string = "x-arrow"): XPluginDef {
-    return XToolBuilder('x-linker-plugin', context => {
+    return doIconTool('x-linker-plugin', (context, hookManager): XIconTool => {
 
-        const b = context.builder;
-        const theme = context.theme;
-        const line = b.makePath();
-        const listeners: LinkedList<Callable> = new LinkedList<Callable>();
-        const hookManager = context.hookManager;
-        const actionListener = hookManager.listener.action;
-        const actionDispatcher = hookManager.dispatcher.action;
-        const filterDispatcher = hookManager.dispatcher.filter;
-        const timer = new Timer(100);
-
-        let isLinking: boolean = false;
-        let sourceNode: XNode, targetNode: XNode;
-
-        line.visible = false;
-        line.strokeWidth = 2;
-        line.strokeColor = theme.primary;
-        line.dashArray = [4, 4];
-
-        context.backLayer.addChild(line);
-
-        function cleanListeners() {
-            listeners.forEach(x => x());
-            listeners.clean();
-        }
-
-        function doListeners() {
-            listeners
-                .push(
-                    actionListener(HookActionEnum.LINK_ZONE_IN, (node: XNode) => {
-                        if (isLinking && sourceNode && sourceNode.id !== node.id) {
-                            targetNode = node;
-                            if (filterDispatcher(HookFilterEnum.NODES_CAN_LINK, true, sourceNode, targetNode)) {
-                                node.command(Command.onNodeFocus);
-                                line.strokeColor = theme.accent;
-                            } else {
-                                node.command(Command.onNodeError);
-                                line.strokeColor = theme.error;
-                            }
-                        }
-                    })
-                );
-
-            listeners
-                .push(
-                    actionListener(HookActionEnum.LINK_ZONE_OUT, (node: XNode) => {
-                        node.command(Command.onNodeNormal);
-                        line.strokeColor = theme.primary;
-                        targetNode = null;
-                    })
-                );
-        }
+        let sourceNode: XNode;
+        let removable: Callable;
 
         return {
             selectEvents: [HookActionEnum.ELEMENT_SELECTED],
             unselectEvents: [
                 HookActionEnum.ELEMENT_START_DRAG,
                 HookActionEnum.BOARD_CLICK,
-                // HookActionEnum.EDGE_SELECTED,
                 HookActionEnum.ELEMENT_DELETED
             ],
-            onSelect(node) {
+            onSelect(node, icon) {
                 sourceNode = node;
+                removable && removable();
+                removable = doLinker(node, icon, node, context, hookManager, solver);
             },
             getPosition(bound: XBound): XPoint {
                 const position = bound.topLeft.clone();
@@ -86,45 +35,6 @@ export default function XLinkerPlugin(solver: string = "x-arrow"): XPluginDef {
                        <line x1="7.5" y1="16.5" x2="16.5" y2="7.5"></line>
                     </svg>`;
             },
-            onButtonReady(linkIcon: XItem): void {
-                linkIcon.on('mousedown', () => {
-                    timer.clear();
-                    timer.handle(() => {
-                        if (sourceNode) {
-                            line.clear();
-                            line.visible = true;
-                            isLinking = true;
-                            doListeners();
-                        }
-                    });
-                });
-
-                linkIcon.on('mouseup', () => {
-                    timer.clear();
-                    isLinking = false;
-                    line.visible = false;
-                    sourceNode && sourceNode.command(Command.onNodeNormal);
-                    targetNode && targetNode.command(Command.onNodeNormal);
-
-                    if (sourceNode && targetNode) {
-                        const localCfg: XElementDef = {solver, src: sourceNode.id, trg: targetNode.id};
-                        actionDispatcher(HookActionEnum.ELEMENT_ADD, localCfg);
-                    }
-                    targetNode = null;
-                    cleanListeners();
-                });
-
-                linkIcon.on('mousedrag', event => {
-                    if (isLinking) {
-                        const src = sourceNode.position;
-                        const trg = event.point;
-                        line.begin();
-                        line.addCommand(PathHelper.moveTo(src));
-                        line.addCommand(PathHelper.lineTo(trg));
-                        line.end();
-                    }
-                });
-            }
         }
     });
 }

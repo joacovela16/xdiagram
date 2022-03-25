@@ -1,8 +1,8 @@
 import {XLightTheme} from "./modules/themes";
 import {PaperRenderer} from "./modules/renderers";
-import {XArrow, XDefaultNode, XNodePort} from "./modules/components";
+import {XArrow, XArrowDef, XDefaultNode, XNodeDef, XNodePort, XNodePortDef} from "./modules/components";
 import {XBoardPlugin, XCopyPlugin, XDataChangePlugin, XDeletePlugin, XInteractivePlugin, XLinkerPlugin, XSelectionPlugin} from "./modules/plugins";
-import {XElementDef, XDiagram} from "./modules/core";
+import XDiagram, { XElementDef } from "./modules/core";
 
 document.body.style.width = '100%';
 document.body.style.height = '400px';
@@ -17,7 +17,7 @@ const xDiagram = new XDiagram(document.body, {
         XArrow
     ],
     plugins: [
-        XBoardPlugin,
+        XBoardPlugin(),
         XSelectionPlugin,
         XLinkerPlugin(),
         XInteractivePlugin,
@@ -36,7 +36,7 @@ xDiagram.getListener().action('x-arrow-config-mapper', (cfg: XElementDef) => {
     return cfg;
 });
 
-xDiagram.addElement({
+xDiagram.addElement<XNodeDef>({
     id: 0,
     solver: 'rounded-node',
     position: {
@@ -46,7 +46,7 @@ xDiagram.addElement({
     text: 'Task-1'
 });
 
-xDiagram.addElement({
+xDiagram.addElement<XNodeDef>({
     id: 1,
     solver: 'rounded-node',
     text: 'Task-2',
@@ -56,7 +56,7 @@ xDiagram.addElement({
     }
 });
 
-xDiagram.addElement({
+xDiagram.addElement<XNodeDef>({
     id: 2,
     solver: 'rounded-node',
     text: 'Task-3',
@@ -65,20 +65,45 @@ xDiagram.addElement({
         y: 200,
     }
 });
-xDiagram.addElement({
+
+xDiagram.addElement<XNodePortDef>({
     id: 3,
     solver: 'port',
     text: 'Task-3',
     position: {
-        x: 500,
+        x: 450,
         y: 200,
     },
-    inNumber: 2,
-    outNumber: 1
+    in: 3,
+    out: 2
 });
 
-xDiagram.addElement({
-    solver: 'x-arrow',
-    src: 2,
-    trg: 1,
+xDiagram.addElement<XNodePortDef>({
+    id: 4,
+    solver: 'port',
+    text: 'Task-4',
+    position: {
+        x: 650,
+        y: 200,
+    },
+    in: 1,
+    out: 1
 });
+
+
+xDiagram.addElement<XNodePortDef>({
+    id: 5,
+    solver: 'port',
+    text: 'Task-5',
+    position: {
+        x: 650,
+        y: 300,
+    },
+    in: 1,
+    out: 1
+});
+
+xDiagram.addElement<XArrowDef>({solver: 'x-arrow', src: 2, trg: 1});
+xDiagram.addElement<XArrowDef>({solver: 'x-arrow', src: 2, trg: 'in:0:3'});
+xDiagram.addElement<XArrowDef>({solver: 'x-arrow', src: 2, trg: 'in:2:3'});
+

@@ -6,7 +6,6 @@ import {Command, HookActionEnum} from "../shared/Instructions";
 const XSelectionPlugin: XPluginDef = definePlugin({
     name: 'x-selection-plugin',
     plugin(context: XContext, hook: HookManager): void {
-
         const b = context.builder;
         const listener: HookListener = hook.listener;
         const actionListener = listener.action;

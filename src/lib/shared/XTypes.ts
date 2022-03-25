@@ -1,18 +1,18 @@
 import type {LinkedList} from "./XList";
-import {Record} from "./XList";
 import type {XBuilder, XBuilderFactory, XItem, XNode} from "./XRender";
 import type {HookActionEnum, HookFilterEnum} from "./Instructions";
 import type {Option} from "./Option";
+import {XBound, XPoint} from "./XRender";
 
-export type XID = number;
-
-export type Holder<T> = { state: T, ref: Record<T> };
+export type XID = number | string;
 
 export type XData = { [index: string]: any };
 
 type XElementBase = {
     id?: XID;
     solver: string;
+    linkable?: boolean;
+    description?: string;
 };
 
 export type XElementDef = XElementBase & XData;
@@ -38,18 +38,23 @@ export type HookListener = {
 };
 
 export type HookDispatcher = {
-    action(name: HookAction, ...args: any): void
+    action(name: HookAction, ...args: any[]): void
 
-    filter<T>(name: HookFilter, data: T, ...args: any): T
+    filter<T>(name: HookFilter, data: T, ...args: any[]): T
 };
 
 export type HookManager = {
     listener: HookListener;
     dispatcher: HookDispatcher;
     hasListeners(name: string): boolean;
+
 };
 
-export type XPlugin = (context: XContext, hook: HookManager) => void;
+export interface HookManagerProxy extends HookManager {
+    clean(): void;
+}
+
+export type XPlugin = (context: XContext, hookManager: HookManager) => Callable | void;
 
 export type XPluginDef = {
     name: string;
@@ -59,9 +64,9 @@ export type XPluginDef = {
 export interface XElementFactory<T = XElementDef> {
     name: string;
     description?: string;
-    onInit?: (context: XContext) => void;
-    onDestroy?: (context: XContext) => void;
-    build: (context: XContext, config: T) => XNode;
+    onInit?: (context: XContext, hookManager: HookManager) => void;
+    onDestroy?: (context: XContext, hookManager: HookManager) => void;
+    build: (context: XContext, hookManager: HookManager, config: T) => XNode;
 }
 
 export interface XContext {
@@ -69,10 +74,10 @@ export interface XContext {
     theme: XTheme;
     element: HTMLElement;
     options: XDiagramOptions;
-    hookManager: HookManager;
-    backLayer: XItem;
-    middleLayer: XItem;
-    frontLayer: XItem;
+
+    getLayer(name: string): XItem;
+
+    removeLayer(name: string): void;
 
     getElements(): LinkedList<XNode>;
 
@@ -106,4 +111,18 @@ export type XTheme = {
     success: string;
     warning: string;
     error: string;
+}
+
+
+export type XIconTool = {
+    selectEvents: HookActionEnum[];
+    unselectEvents: HookActionEnum[];
+    onSelect?: (node: XNode, icon: XItem) => void;
+    iconHoverColor?: (theme: XTheme) => string;
+    onClick?: (node: XNode) => void;
+    onButtonReady?: (node: XItem) => void;
+
+    icon(theme: XTheme): string;
+
+    getPosition(bound: XBound): XPoint;
 }

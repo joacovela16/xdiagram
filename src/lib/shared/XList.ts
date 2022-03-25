@@ -9,21 +9,24 @@ export class Record<T> {
     private belongTo: LinkedList<T>;
 
     constructor(previous: Record<T>, data: T, next: Record<T>, belongTo: LinkedList<T>) {
-        this.previous = previous;
-        this.data = data;
-        this.next = next;
-        this.belongTo = belongTo;
+        const me = this;
+        me.previous = previous;
+        me.data = data;
+        me.next = next;
+        me.belongTo = belongTo;
     }
 
     remove(): void {
-        if (this.active) {
-            this.active = false;
-            this.belongTo.remove(this);
+        const me = this;
+        if (me.active) {
+            me.active = false;
+            me.belongTo.remove(me);
         }
     }
     getAndRemove(f: (x: T) =>void): void{
-        f(this.data);
-        this.remove();
+        const me = this;
+        f(me.data);
+        me.remove();
     }
 }
 
@@ -55,21 +58,6 @@ export class LinkedList<T> {
         return record;
     }
 
-    appendRecord(record: Record<T>): Record<T> {
-        const me = this;
-
-        if (isUndefined(me.first)) {
-            me.first = record;
-            me.last = record;
-        } else {
-            const last: Record<T> = me.last;
-            last.next = record;
-            record.previous = last;
-            me.last = record;
-        }
-        me.length++;
-        return record;
-    }
 
     prepend(data: T): Record<T> {
         const me: LinkedList<T> = this;

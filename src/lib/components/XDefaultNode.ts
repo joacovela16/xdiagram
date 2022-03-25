@@ -1,9 +1,9 @@
-import {doLinkZone, doNumberSnap, doReceptor, getOrElse} from "../shared/XLib";
-import {type XContext, XElementDef, type XElementFactory, type XTheme} from "../shared/XTypes";
-import type {XBuilder, XNode} from "../shared/XRender";
+import {doLinkZone, doNumberSnap, doReceptor, doSnap, getOrElse} from "../shared/XLib";
+import {HookManager, type XContext, XElementDef, type XElementFactory, type XTheme} from "../shared/XTypes";
+import type {XBuilder, XNode, XPoint} from "../shared/XRender";
 import {Command, HookActionEnum, HookFilterEnum} from "../shared/Instructions";
 import {defineElement} from "../shared/XHelper";
-import {MAKE_INTERACTIVE} from "../plugins/XInteractivePlugin";
+
 
 interface XNodeRectDef {
     name: string;
@@ -17,15 +17,28 @@ interface XNodeRectDef {
     fillColor?: string;
 }
 
+type Coord = { x: number; y: number; };
+export type XNodeDef = {
+    text: string;
+    fontSize?: number;
+    radius?: number;
+    padding?: number;
+    textColor?: string;
+    strokeColor?: string;
+    strokeWidth?: number;
+    fillColor?: string;
+    position: Coord;
+} & XElementDef;
+
 export default function XDefaultNode(conf: XNodeRectDef): XElementFactory {
-    return defineElement({
+    return defineElement<XNodeDef>({
         name: conf.name,
-        build (context: XContext, cfg: XElementDef): XNode {
-            const config: XElementDef = {...cfg, ...conf};
-            const position = config.position;
+        build(context: XContext, hookManager:HookManager, cfg: XNodeDef): XNode {
+            const config: XNodeDef = {...cfg, ...conf};
+            const position: Coord = config.position;
             const b: XBuilder = context.builder;
-            const actionDispatcher = context.hookManager.dispatcher.action;
-            const filterDispatcher = context.hookManager.dispatcher.filter;
+            const actionDispatcher = hookManager.dispatcher.action;
+            const filterDispatcher = hookManager.dispatcher.filter;
             const theme: XTheme = context.theme;
 
             const radius: number = getOrElse(config.radius, 0);
@@ -50,23 +63,32 @@ export default function XDefaultNode(conf: XNodeRectDef): XElementFactory {
 
             const command = doReceptor(
                 {
-                    [Command.onNodeFocus]() {
+                    [Command.onElementLinkIn]() {
                         rectEl.strokeColor = theme.accent;
                         rectEl.strokeWidth = 3;
                     },
-                    [Command.onNodeNormal]() {
+                    [Command.onElementLinkOut]() {
                         rectEl.strokeColor = getOrElse(config.strokeColor, theme.primary);
                         rectEl.strokeWidth = getOrElse(config.strokeWidth, 0);
                     },
-                    [Command.onNodeError]() {
+                    [Command.onElementNormal]() {
+                        rectEl.strokeColor = getOrElse(config.strokeColor, theme.primary);
+                        rectEl.strokeWidth = getOrElse(config.strokeWidth, 0);
+                    },
+                    [Command.onElementError]() {
                         rectEl.strokeColor = theme.error;
                     },
                     [Command.remove]() {
-                        if (filterDispatcher(HookFilterEnum.NODE_CAN_REMOVE, true, rootEl) ) {
+                        if (filterDispatcher(HookFilterEnum.ELEMENT_CAN_REMOVE, true, rootEl)) {
                             context.removeElement(config.id);
                             rootEl.remove();
                             actionDispatcher(HookActionEnum.ELEMENT_DELETED, rootEl);
+                            actionDispatcher(`${rootEl.id}-deleted`);
                         }
+                    },
+                    [Command.elementDrag](point: XPoint) {
+                        rootEl.moveTo(doSnap(point));
+                        actionDispatcher(`${rootEl.id}-drag`, rootEl);
                     }
                 }
             );
@@ -81,10 +103,11 @@ export default function XDefaultNode(conf: XNodeRectDef): XElementFactory {
 
             rootEl.id = config.id;
             rootEl.data = config;
-            context.frontLayer.addChild(rootEl);
+            config.linkable = true;
+            context.getLayer('middle').addChild(rootEl);
 
-            doLinkZone(rootEl, context);
-            actionDispatcher(MAKE_INTERACTIVE, rootEl);
+            doLinkZone(rootEl, hookManager);
+            actionDispatcher("x-make-interactive", rootEl, rootEl);
 
             return rootEl;
         }

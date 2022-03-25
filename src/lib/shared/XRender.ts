@@ -1,6 +1,4 @@
-import type {Callable, XData} from "./XTypes";
-
-export type XId = number;
+import type {Callable, XData, XID} from "./XTypes";
 
 export type XEventName =
     "mousedown" |
@@ -257,7 +255,7 @@ export interface XBound {
 }
 
 export interface XItem {
-    id: XId
+    id: XID
     visible: boolean;
     locked: boolean;
     strokeWidth: number;

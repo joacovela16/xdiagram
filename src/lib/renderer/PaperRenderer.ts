@@ -1,6 +1,6 @@
 import {Color, Group, PaperScope, Path, Point, PointText, Raster, Rectangle, Size} from "paper";
-import type {PathCommand, XBound, XBuilder, XCompoundDef, XEvent, XEventName, XId, XItem, XNode, XPoint, XRaster, XShape, XSize, XText} from "../shared/XRender";
-import type {Callable} from "../shared/XTypes";
+import type {PathCommand, XBound, XBuilder, XCompoundDef, XEvent, XEventName, XItem, XNode, XPoint, XRaster, XShape, XSize, XText} from "../shared/XRender";
+import type {Callable, XID} from "../shared/XTypes";
 
 class PSize implements XSize {
 
@@ -479,7 +479,7 @@ class PPoint implements XPoint {
 }
 
 class PNode<T extends paper.Item = paper.Item> implements XItem {
-    id: XId;
+    id: XID;
     mainEl: T;
     mainContainer: T
     root: T
@@ -593,7 +593,7 @@ class PNode<T extends paper.Item = paper.Item> implements XItem {
     on(name: XEventName, handler: (e: XEvent) => void): Callable {
         const self = this;
         const me: T = this.mainEl;
-        const h = (e: paper.MouseEvent): void => {
+        const h = (e: paper.MouseEvent) => {
             handler({
                 point: PPoint.fromPoint(e.point),
                 delta: PPoint.fromPoint(e.delta),
@@ -963,11 +963,9 @@ class PaperBuilder implements XBuilder {
         this.project.clear();
         this.project.remove();
     }
-
-
 }
 
-export default function PaperRenderer(element: HTMLElement) {
+export default function PaperRenderer(element: HTMLElement) :XBuilder{
     const canvas = document.createElement('canvas');
     canvas.style.width = '100%'
     canvas.style.height = '100%'

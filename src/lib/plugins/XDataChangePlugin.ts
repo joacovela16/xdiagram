@@ -27,7 +27,7 @@ export default function XDataChangePlugin() {
             actionListener(HookActionEnum.ELEMENT_END_DRAG, handler);
 
             function prepareData() {
-                const data = context.getElements().filter(x=>isDefined(x.data)).map(x => x.data).toArray()
+                const data = context.getElements().map(x => x.data).toArray()
                 actionDispatcher(X_ON_DATA_CHANGE_EVENT, data);
             }
         }

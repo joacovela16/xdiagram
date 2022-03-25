@@ -33,8 +33,8 @@ const declPlugin = {
 }
 export default defineConfig({
     build: {
-        minify: true,
-        sourcemap: true,
+        minify: 'terser',
+        sourcemap: 'inline',
         rollupOptions: {
             preserveEntrySignatures: true,
             input: {

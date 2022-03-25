@@ -1,4 +1,4 @@
-import {cutSegment, doHover, doReceptor, doSnap, getOrElse, isUndefined, Timer} from "../shared/XLib";
+import {cutSegment, doHover, doReceptor, doSnap, getOrElse, isDefined, isUndefined, Timer} from "../shared/XLib";
 import type {XContext, XElementDef, XElementFactory, XID, XTheme} from "../shared/XTypes";
 import {Callable} from "../shared/XTypes";
 import {defineElement} from "../shared/XHelper";
@@ -28,18 +28,24 @@ interface ArrowExtreme extends XDraw {
 
 type Coord = { x: number; y: number };
 
+export type XArrowDef = {
+    src: XID;
+    trg: XID;
+    stages?: Coord[];
+} & XElementDef;
+
 function isZero(n: number, epsilon: number = 0.05) {
     return n > -epsilon && n < epsilon;
 }
 
-const XArrow: XElementFactory = defineElement({
+const XArrow: XElementFactory = defineElement<XArrowDef>({
     name: 'x-arrow',
-    onInit(context) {
-        let listener = context.hookManager.listener;
-        listener.filter("x-linker-button-plugin-can-apply", (value: boolean, node: XNode) => node.data.solver !== 'x-arrow');
-        listener.filter("x-copy-plugin-can-apply", (value: boolean, node: XNode) => node.data.solver !== 'x-arrow');
+    onInit(context, hookManager) {
+        let listener = hookManager.listener;
+        listener.filter("x-linker-plugin-can-apply", (value: boolean, node: XNode) => node.data.solver === 'x-arrow' ? false : value);
+        listener.filter("x-copy-plugin-can-apply", (value: boolean, node: XNode) => node.data.solver === 'x-arrow' ? false : value);
     },
-    build(context: XContext, config: XElementDef): XNode {
+    build(context: XContext, hookManager, config: XArrowDef): XNode {
 
         const ID: XID = config.id;
         const b: XBuilder = context.builder;
@@ -63,7 +69,6 @@ const XArrow: XElementFactory = defineElement({
 
         // install components
         const theme: XTheme = context.theme;
-        const hookManager = context.hookManager;
         const actionDispatcher = hookManager.dispatcher.action;
         const filterDispatcher = hookManager.dispatcher.filter;
         const actionListener = hookManager.listener.action;
@@ -103,20 +108,20 @@ const XArrow: XElementFactory = defineElement({
         let nodeSetter: (n: XItem) => void;
         let srcRefNode: XNode, trgRefNode: XNode;
 
-
-
         if (initialStages.length > 1) {
             for (let i = 0; i < stagesCount; i++) {
                 const datum = initialStages[i];
                 stages[i] = {index: i, point: b.makePoint(datum.x, datum.y)};
             }
-        }else{
-            context.getElement(config.src).foreach(x => {
+        } else {
+            const localSrc: XID = config.src;
+            const localTrg: XID = config.trg;
+            context.getElement(localSrc).foreach(x => {
                 srcRefNode = x;
                 isUndefined(stages[0]) && stages.push({index: 0, point: x.bounds.center});
 
             });
-            context.getElement(config.trg).foreach(x => {
+            context.getElement(localTrg).foreach(x => {
                 trgRefNode = x;
                 isUndefined(stages[1]) && stages.push({index: 1, point: x.bounds.center});
             });
@@ -125,6 +130,8 @@ const XArrow: XElementFactory = defineElement({
         stagesCount = stages.length;
         path.strokeColor = theme.accent;
         path.strokeWidth = 3;
+        rootEl.id = config.id;
+        config.linkable = false;
 
         buildArrowTool(stages[0]);
         buildArrowTool(stages[1]);
@@ -171,7 +178,6 @@ const XArrow: XElementFactory = defineElement({
             } else {
                 isSelectionMode = true;
                 setToolsVisible(true);
-                // actionDispatcher(HookActionEnum.EDGE_SELECTED, rootEl);
                 actionDispatcher(HookActionEnum.ELEMENT_SELECTED, rootEl);
             }
         });
@@ -181,18 +187,29 @@ const XArrow: XElementFactory = defineElement({
             dashArray && (path.dashArray = dashArray);
         });
 
-        context.frontLayer.addChild(rootEl);
+        context.getLayer('front').addChild(rootEl);
         rootEl.data = config;
 
+        srcRefNode && trgRefNode && actionDispatcher(HookActionEnum.ELEMENTS_LINKED, srcRefNode.id, trgRefNode.id);
         updatePositions();
 
         function removeThis() {
+
+            actionDispatcher(HookActionEnum.ELEMENT_DELETED, rootEl);
+            const src: XID = config.src;
+            const trg: XID = config.trg;
+            const srcDef = isDefined(src);
+            const trgDef = isDefined(trg);
+
+            srcDef && actionDispatcher(HookActionEnum.ELEMENT_UNLINKED, src);
+            trgDef && actionDispatcher(HookActionEnum.ELEMENT_UNLINKED, trg);
+            srcDef && trgDef && actionDispatcher(HookActionEnum.ELEMENTS_UNLINKED, src, trg);
+
             context.removeElement(ID);
             rootEl.remove();
             confReactive.clean();
             onRemoveCallable.forEach(x => x());
             onRemoveCallable.clean();
-            actionDispatcher(HookActionEnum.ELEMENT_DELETED, rootEl);
         }
 
         function hideAll() {
@@ -225,7 +242,7 @@ const XArrow: XElementFactory = defineElement({
                 setVisible(v: boolean): void {
                     circle.visible = v;
                 },
-                setPosition(start: XPoint, end: XPoint) {
+                setPosition(_start: XPoint, _end: XPoint) {
                 }
             };
 
@@ -314,35 +331,37 @@ const XArrow: XElementFactory = defineElement({
             path.end();
         }
 
-        function buildCircleShape(): ArrowExtreme {
-            const el = b.makeCircle(b.makePoint(0, 0), 5);
+        /*
+                function buildCircleShape(): ArrowExtreme {
+                    const el = b.makeCircle(b.makePoint(0, 0), 5);
 
-            let startPoint: XPoint, endPoint: XPoint;
-            const _draw = () => {
-            };
+                    let startPoint: XPoint, endPoint: XPoint;
+                    const _draw = () => {
+                    };
 
-            return {
-                element: el,
-                contains(p: XPoint): boolean {
-                    return el.contains(p);
-                },
-                draw(): void {
-                    _draw();
-                },
-                remove(): void {
-                    el.remove();
-                },
-                setPosition(start: XPoint, end: XPoint): void {
-                    startPoint = start;
-                    endPoint = end;
-                    _draw();
-                },
-                setVisible(v: boolean): void {
-                    el.visible = v;
+                    return {
+                        element: el,
+                        contains(p: XPoint): boolean {
+                            return el.contains(p);
+                        },
+                        draw(): void {
+                            _draw();
+                        },
+                        remove(): void {
+                            el.remove();
+                        },
+                        setPosition(start: XPoint, end: XPoint): void {
+                            startPoint = start;
+                            endPoint = end;
+                            _draw();
+                        },
+                        setVisible(v: boolean): void {
+                            el.visible = v;
+                        }
+
+                    }
                 }
-
-            }
-        }
+        */
 
         function buildTriangleShape(length: number, angle: number): ArrowExtreme {
             const trianglePath = b.makePath();
@@ -450,7 +469,7 @@ const XArrow: XElementFactory = defineElement({
                     updatePositions();
 
                     if (nodeSelection && !nodeSelection.contains(event.point)) {
-                        nodeSelection.command(Command.onNodeNormal);
+                        nodeSelection.command(Command.onElementLinkOut);
                         nodeSelection = null;
                     }
 
@@ -462,18 +481,17 @@ const XArrow: XElementFactory = defineElement({
                             .find(x => x.contains(event.point))
                             .foreach(node => {
 
-
                                 if (isUndefined(nodeSelection) || nodeSelection.id !== node.id) {
                                     if (isUndefined(srcRefNode) && isUndefined(trgRefNode)) {
-                                        node.command(Command.onNodeFocus);
+                                        node.command(Command.onElementLinkIn, ID);
                                         nodeSelection = node;
                                     } else {
-                                        const result = filterDispatcher(HookFilterEnum.NODES_CAN_LINK, true, srcRefNode || node, trgRefNode || node);
+                                        const result = filterDispatcher(HookFilterEnum.ELEMENTS_CAN_LINK, true, srcRefNode || node, trgRefNode || node);
                                         if (result) {
-                                            node.command(Command.onNodeFocus);
+                                            node.command(Command.onElementLinkIn, ID);
                                             nodeSelection = node;
                                         } else {
-                                            node.command(Command.onNodeError);
+                                            node.command(Command.onElementError);
                                             nodeSelection = null;
                                         }
                                     }
@@ -484,13 +502,6 @@ const XArrow: XElementFactory = defineElement({
             });
 
             secondaryEl.on('mousedown', () => {
-                if (isSource) {
-                    srcRefNode = null;
-                    config.src = undefined;
-                } else {
-                    trgRefNode = null;
-                    config.trg = undefined;
-                }
                 setter(null);
                 nodeSetter = setter;
                 isDraggingMode = true;
@@ -502,17 +513,17 @@ const XArrow: XElementFactory = defineElement({
                 htmlElement.style.cursor = 'default';
 
                 if (nodeSelection) {
-                    setter(nodeSelection);
+                    nodeSelection.command(Command.onElementNormal);
+                    nodeSetter(nodeSelection);
                     updatePositions();
                     updateData();
-                    nodeSelection.command(Command.onNodeNormal);
                     nodeSelection = null;
                 }
                 nodeSetter = null;
                 actionDispatcher(HookActionEnum.ELEMENT_END_DRAG, rootEl);
             });
             secondaryEl.on('mouseenter', () => htmlElement.style.cursor = 'pointer');
-            secondaryEl.on('mouseleave', e => !isDraggingMode && hideAll());
+            secondaryEl.on('mouseleave', () => !isDraggingMode && hideAll());
 
             _draw();
 
@@ -532,7 +543,7 @@ const XArrow: XElementFactory = defineElement({
                 draw(): void {
                     _draw()
                 },
-                setPosition(start: XPoint, end: XPoint) {
+                setPosition(_start: XPoint, _end: XPoint) {
                 }
             };
             tools.push(item);
@@ -561,27 +572,32 @@ const XArrow: XElementFactory = defineElement({
 
                 if (isSource) {
                     return (node: XNode) => {
-                        srcRefNode = node;
                         clean();
-
                         if (node) {
                             config.src = node.id;
+                            srcRefNode = node;
+                            node.command(Command.onElementLinked, ID);
                             installer(node);
                         } else {
+                            actionDispatcher(HookActionEnum.ELEMENT_UNLINKED, config.src);
                             config.src = undefined;
+                            srcRefNode && srcRefNode.command(Command.onElementUnLinked, ID);
+                            srcRefNode = null;
                         }
                     };
                 } else {
                     return (node: XNode) => {
-                        trgRefNode = node;
-
                         clean();
-
                         if (node) {
                             config.trg = node.id;
+                            trgRefNode = node;
+                            node.command(Command.onElementLinked, ID);
                             installer(node);
                         } else {
+                            actionDispatcher(HookActionEnum.ELEMENT_UNLINKED, config.trg);
                             config.trg = undefined;
+                            trgRefNode && trgRefNode.command(Command.onElementUnLinked, ID);
+                            trgRefNode = null;
                         }
                     };
                 }
