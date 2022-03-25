@@ -13,11 +13,12 @@ A customizable PaperJS based diagram library.
 
 ### Example
 ```typescript
-import {XLightTheme} from "./modules/themes";
-import {PaperRenderer} from "./modules/renderers";
-import {XArrow, XArrowDef, XDefaultNode, XNodeDef, XNodePort, XNodePortDef} from "./modules/components";
-import {XBoardPlugin, XCopyPlugin, XDataChangePlugin, XDeletePlugin, XInteractivePlugin, XLinkerPlugin, XSelectionPlugin} from "./modules/plugins";
-import XDiagram, { XElementDef } from "./modules/core";
+
+import {XLightTheme} from "x-diagram/themes";
+import {PaperRenderer} from "x-diagram/renderers";
+import {XArrow, XArrowDef, XDefaultNode, XNodeDef, XNodePort, XNodePortDef} from "x-diagram/components";
+import {XBoardPlugin, XCopyPlugin, XDataChangePlugin, XDeletePlugin, XInteractivePlugin, XLinkerPlugin, XSelectionPlugin} from "x-diagram/plugins";
+import {XDiagram, XElementDef} from "x-diagram";
 
 document.body.style.width = '100%';
 document.body.style.height = '400px';
@@ -121,4 +122,5 @@ xDiagram.addElement<XNodePortDef>({
 xDiagram.addElement<XArrowDef>({solver: 'x-arrow', src: 2, trg: 1});
 xDiagram.addElement<XArrowDef>({solver: 'x-arrow', src: 2, trg: 'in:0:3'});
 xDiagram.addElement<XArrowDef>({solver: 'x-arrow', src: 2, trg: 'in:2:3'});
+
 ```

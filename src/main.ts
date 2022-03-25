@@ -2,7 +2,7 @@ import {XLightTheme} from "./modules/themes";
 import {PaperRenderer} from "./modules/renderers";
 import {XArrow, XArrowDef, XDefaultNode, XNodeDef, XNodePort, XNodePortDef} from "./modules/components";
 import {XBoardPlugin, XCopyPlugin, XDataChangePlugin, XDeletePlugin, XInteractivePlugin, XLinkerPlugin, XSelectionPlugin} from "./modules/plugins";
-import XDiagram, { XElementDef } from "./modules/core";
+import {XDiagram, XElementDef} from "./modules/core";
 
 document.body.style.width = '100%';
 document.body.style.height = '400px';

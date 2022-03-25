@@ -7,4 +7,4 @@ export * from '../lib/shared/XList';
 export * from '../lib/shared/Reactive';
 export * from '../lib/shared/Option';
 export * from '../lib/shared/XTypes';
-export default XDiagram;
+export {XDiagram};
