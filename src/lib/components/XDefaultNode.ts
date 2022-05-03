@@ -93,7 +93,7 @@ export default function XDefaultNode(conf: XNodeRectDef): XElementFactory {
                 }
             );
 
-            const rootEl = b.makeCompound({
+            const rootEl = b.makeInteractive({
                 items: [rectEl, textEl],
                 command,
                 getIntersections(shape) {

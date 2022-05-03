@@ -3,7 +3,7 @@ import {XBound, XNode, XPoint} from "../shared/XRender";
 import {XTheme} from "../shared/XTypes";
 import {doIconTool} from "../shared/XLib";
 
-export const XDeletePlugin = doIconTool('x-element-delete', () => {
+export const XDeletePlugin = doIconTool('x-delete-plugin', () => {
     return {
         selectEvents: [HookActionEnum.ELEMENT_SELECTED],
         unselectEvents: [HookActionEnum.ELEMENT_START_DRAG, HookActionEnum.BOARD_CLICK, HookActionEnum.ELEMENT_DELETED],

@@ -8,6 +8,7 @@ import {LinkedList} from "../shared/XList";
 type PortConf = {
     isOuter: boolean;
     source: XID[];
+    labels: string[];
     src: number;
     trg: number;
     xOffset: number;
@@ -32,65 +33,75 @@ type XNodeBase = {
 };
 
 type XNodePortBase = {
-
-    orientation?: 'vertical' | 'horizontal';
-
-    in: number;
-    inRadius?: number;
+    portTextSize?: number;
+    in: string[];
     inColor?: string;
     inStrokeColor?: string;
     inStrikeWidth?: number;
 
-    out: number;
-    outRadius?: number;
+    out: string[];
     outColor?: string;
     outStrokeColor?: string;
     outStrikeWidth?: number;
 };
 
-export type XNodePortDef = XNodePortBase & XElementDef;
+export type XFunctionPortDef = XNodePortBase & XElementDef;
 
-const DEFAULT_RADIUS_SIZE: number = 8;
+export default function XFunctionPort(cfg: XNodeBase): XElementFactory<XFunctionPortDef> {
 
-export default function XNodePort(cfg: XNodeBase): XElementFactory<XNodePortDef> {
+    const NODE_TYPE = 'function-node-port'
 
-    const NODE_PORT = 'node-port'
-
-    return defineElement<XNodePortDef>({
+    return defineElement<XFunctionPortDef>({
         name: cfg.name,
         onInit(context, hookManager) {
             const listener = hookManager.listener;
             const links: Set<string> = new Set<string>();
+            const defaultFilter = (value: boolean, node: XNode) => {
+                const data = node.data;
+                if (data && data.type === NODE_TYPE) {
+                    return false;
+                }
+                return value;
+            };
 
             listener.filter(HookFilterEnum.ELEMENTS_CAN_LINK, (v: boolean, src: XNode, trg: XNode) => {
                 const srcData = src.data;
                 const trgData = trg.data;
 
-                if (srcData && srcData.type === NODE_PORT && isDefined(srcData.parent) && links.has(`${srcData.parent}-${src.id}`)) {
+                if (srcData && srcData.type === NODE_TYPE && isDefined(srcData.parent) && links.has(`${srcData.parent}-${src.id}`)) {
                     return false;
                 }
 
-                if (trgData && trgData.type === NODE_PORT && isDefined(trgData.parent) && links.has(`${trgData.parent}-${trg.id}`)) {
+                if (trgData && trgData.type === NODE_TYPE && isDefined(trgData.parent) && links.has(`${trgData.parent}-${trg.id}`)) {
                     return false;
                 }
 
-                if (srcData && srcData.type === NODE_PORT && trgData && trgData.type === NODE_PORT && srcData && trgData && srcData.isOut && trgData.isOut) {
+                if (srcData && srcData.type === NODE_TYPE && trgData && trgData.type === NODE_TYPE && srcData && trgData && srcData.isOut && trgData.isOut) {
                     return false;
                 }
                 return v;
             });
 
             listener.filter("x-linker-plugin-can-apply", (value: boolean, node: XNode) => {
-                if (node.data.solver === cfg.name) {
-                    return false;
+                const data = node.data;
+                if (data) {
+                    if (data.type === NODE_TYPE) return false;
+                    if (data.solver === cfg.name) {
+                        return false;
+                    }
                 }
                 return value;
             });
 
+
+            listener.filter("x-delete-plugin-can-apply", defaultFilter);
+            listener.filter("x-copy-plugin-can-apply", defaultFilter);
+
+
             listener.action(HookActionEnum.ELEMENT_UNLINKED, (id: XID) => {
                 context
                     .getElement(id)
-                    .filter(x => isDefined(x.data) && isDefined(x.data.parent) && x.data.type === NODE_PORT)
+                    .filter(x => isDefined(x.data) && isDefined(x.data.parent) && x.data.type === NODE_TYPE)
                     .foreach(node => {
                         const data = node.data;
                         const parent: XID = data.parent;
@@ -117,7 +128,7 @@ export default function XNodePort(cfg: XNodeBase): XElementFactory<XNodePortDef>
                 [src, trg].forEach(id => {
                     context
                         .getElement(id)
-                        .filter(x => x.data && x.data.type === NODE_PORT)
+                        .filter(x => x.data && x.data.type === NODE_TYPE)
                         .foreach(node => {
                             const parent: XID = node.data.parent;
                             links.add(`${parent}-${node.id}`);
@@ -125,8 +136,8 @@ export default function XNodePort(cfg: XNodeBase): XElementFactory<XNodePortDef>
                 });
             });
         },
-        build(context: XContext, hookManager, config: XNodePortDef): XNode {
-            const finalCfg: XNodePortDef = {...cfg, ...config};
+        build(context: XContext, hookManager, config: XFunctionPortDef): XNode {
+            const finalCfg: XFunctionPortDef = {...cfg, ...config};
             const b = context.builder;
             const actionDispatcher = hookManager.dispatcher.action;
             const filterDispatcher = hookManager.dispatcher.filter;
@@ -135,7 +146,7 @@ export default function XNodePort(cfg: XNodeBase): XElementFactory<XNodePortDef>
             const position = finalCfg.position;
             const radius: number = getOrElse(finalCfg.radius, 10);
             const padding: number = getOrElse(finalCfg.padding, 10);
-
+            const portTextSize: number = getOrElse(finalCfg.portTextSize, 14);
             const taskOnRemove: LinkedList<Callable> = new LinkedList<Callable>();
 
             const textPoint = b.makePoint(position.x, position.y);
@@ -147,23 +158,24 @@ export default function XNodePort(cfg: XNodeBase): XElementFactory<XNodePortDef>
 
             // render ports
             const portsElements: XNode[] = [];
-            const inNumber = finalCfg.in;
-            const outNumber = finalCfg.out;
-            const inner: number[] = doArray<number>(inNumber);
-            const outer: number[] = doArray<number>(outNumber);
-            const isVertical = finalCfg.orientation === "vertical";
+            const innerDef = finalCfg.in || [];
+            const outerDef = finalCfg.out || [];
+            const inNumber = innerDef.length;
+            const outNumber = outerDef.length;
+            const inner: string[] = doArray(innerDef.length);
+            const outer: string[] = doArray(outerDef.length);
             const portsConf: PortConf[] = []
             finalCfg.inner = inner;
             finalCfg.outer = outer;
 
 
-            const maxPorts = Math.max(inNumber * getOrElse(finalCfg.inRadius, DEFAULT_RADIUS_SIZE), outNumber * getOrElse(finalCfg.outRadius, DEFAULT_RADIUS_SIZE)) * 3;
+            const maxPorts = Math.max(inNumber * portTextSize, outNumber * portTextSize) * 3;
             const textPaperBounds = textEl.bounds.clone();
             const tmpWidth = textPaperBounds.width + padding;
             const tmpHeight = textPaperBounds.height * 2;
 
-            textPaperBounds.width = isVertical ? Math.max(maxPorts, tmpWidth) : tmpWidth;
-            textPaperBounds.height = isVertical ? tmpHeight : Math.max(tmpHeight, maxPorts);
+            textPaperBounds.width = tmpWidth;
+            textPaperBounds.height = Math.max(tmpHeight, maxPorts);
             textPaperBounds.center = textEl.bounds.center;
 
             const rectEl = b.makeRect(textPaperBounds, radius);
@@ -173,72 +185,42 @@ export default function XNodePort(cfg: XNodeBase): XElementFactory<XNodePortDef>
             rectEl.strokeWidth = getOrElse(finalCfg.strokeWidth, 0);
             rectEl.fillColor = getOrElse(finalCfg.fillColor, theme.primaryContent);
 
-            if (isVertical) {
-                const distance = bounds.topRight.getDistance(bounds.topLeft);
-                if (inNumber > 0) {
-                    portsConf.push({
-                        isOuter: false,
-                        source: inner,
-                        src: bounds.topLeft.x,
-                        trg: bounds.topRight.x,
-                        pointRef: bounds.topLeft,
-                        fill: getOrElse(finalCfg.inColor, theme.primary),
-                        xOffset: distance / (inNumber + 1),
-                        yOffset: 0,
-                        radius: getOrElse(finalCfg.inRadius, DEFAULT_RADIUS_SIZE),
-                        strokeColor: getOrElse(finalCfg.inStrokeColor, theme.neutral),
-                        strokeWidth: getOrElse(finalCfg.inStrikeWidth, 0)
-                    });
-                }
 
-                if (outNumber > 0) {
-                    portsConf.push({
-                        isOuter: true,
-                        source: outer,
-                        src: bounds.bottomLeft.x,
-                        trg: bounds.bottomRight.x,
-                        pointRef: bounds.bottomLeft,
-                        fill: getOrElse(finalCfg.outColor, theme.secondary),
-                        xOffset: distance / (outNumber + 1),
-                        yOffset: 0,
-                        radius: getOrElse(finalCfg.outRadius, DEFAULT_RADIUS_SIZE),
-                        strokeColor: getOrElse(finalCfg.outStrokeColor, theme.neutral),
-                        strokeWidth: getOrElse(finalCfg.outStrikeWidth, 0)
-                    });
-                }
-            } else {
-                const distance = bounds.bottomLeft.getDistance(bounds.topLeft);
-                if (inNumber > 0) {
-                    portsConf.push({
-                        isOuter: false,
-                        source: inner,
-                        src: bounds.topLeft.y,
-                        trg: bounds.bottomLeft.y,
-                        pointRef: bounds.topLeft,
-                        fill: getOrElse(finalCfg.inColor, theme.primary),
-                        xOffset: 0,
-                        yOffset: distance / (inNumber + 1),
-                        radius: getOrElse(finalCfg.inRadius, 15),
-                        strokeColor: getOrElse(finalCfg.inStrokeColor, theme.neutral),
-                        strokeWidth: getOrElse(finalCfg.inStrikeWidth, 0)
-                    });
-                }
+            const DEFAULT_OFFSET: number = 10;
+            const distance = bounds.bottomLeft.getDistance(bounds.topLeft);
 
-                if (outNumber > 0) {
-                    portsConf.push({
-                        isOuter: true,
-                        source: outer,
-                        src: bounds.topRight.y,
-                        trg: bounds.bottomRight.y,
-                        pointRef: bounds.topRight,
-                        fill: getOrElse(finalCfg.outColor, theme.secondary),
-                        xOffset: 0,
-                        yOffset: distance / (outNumber + 1),
-                        radius: getOrElse(finalCfg.outRadius, 15),
-                        strokeColor: getOrElse(finalCfg.outStrokeColor, theme.neutral),
-                        strokeWidth: getOrElse(finalCfg.outStrikeWidth, 0)
-                    });
-                }
+            if (inNumber > 0) {
+                portsConf.push({
+                    isOuter: false,
+                    source: inner,
+                    labels: innerDef,
+                    src: bounds.topLeft.y,
+                    trg: bounds.bottomLeft.y,
+                    pointRef: bounds.topLeft,
+                    fill: getOrElse(finalCfg.inColor, theme.primary),
+                    xOffset: -DEFAULT_OFFSET,
+                    yOffset: distance / (inNumber + 1),
+                    radius: getOrElse(finalCfg.inRadius, 15),
+                    strokeColor: getOrElse(finalCfg.inStrokeColor, theme.neutral),
+                    strokeWidth: getOrElse(finalCfg.inStrikeWidth, 0)
+                });
+            }
+
+            if (outNumber > 0) {
+                portsConf.push({
+                    isOuter: true,
+                    source: outer,
+                    labels: outerDef,
+                    src: bounds.topRight.y,
+                    trg: bounds.bottomRight.y,
+                    pointRef: bounds.topRight,
+                    fill: getOrElse(finalCfg.outColor, theme.secondary),
+                    xOffset: DEFAULT_OFFSET,
+                    yOffset: distance / (outNumber + 1),
+                    radius: getOrElse(finalCfg.outRadius, 15),
+                    strokeColor: getOrElse(finalCfg.outStrokeColor, theme.neutral),
+                    strokeWidth: getOrElse(finalCfg.outStrikeWidth, 0)
+                });
             }
 
             const portsElementsLength = portsConf.length;
@@ -246,6 +228,7 @@ export default function XNodePort(cfg: XNodeBase): XElementFactory<XNodePortDef>
             for (let i = 0; i < portsElementsLength; i++) {
                 const datum = portsConf[i];
                 const source = datum.source;
+                const labels = datum.labels;
                 const count = source.length;
                 const kind = (datum.isOuter && 'out') || 'in';
                 const isOuter = datum.isOuter;
@@ -253,29 +236,33 @@ export default function XNodePort(cfg: XNodeBase): XElementFactory<XNodePortDef>
 
                 for (let j = 0; j < count; j++) {
                     const finalPt = point.clone();
-                    finalPt.x += datum.xOffset;
+                    const x = point.x + datum.xOffset;
                     finalPt.y += datum.yOffset;
+                    const p = b.makePoint(x, finalPt.y);
 
-                    const circle = b.makeCircle(finalPt, radius);
-                    circle.fillColor = datum.fill;
-                    // circle.strokeWidth = datum.strokeWidth;
-                    // circle.strokeColor = datum.strokeColor;
+
+                    const text = b.makeText(finalPt, labels[j]);
+                    text.fillColor = theme.base100;
+                    text.fontSize = portTextSize;
+
+                    const rect = b.makeRect(text.bounds.scale(1.5, 1.2), radius);
+                    rect.fillColor = datum.fill;
 
                     const localID: XID = `${kind}:${j}:${PARENT_ID}`;
                     const compound: XNode = b.makeInteractive({
-                        items: [circle],
+                        items: [rect, text],
                         command: doReceptor({
                             [Command.onElementLinkIn]() {
-                                circle.fillColor = isUndefined(source[j]) ? theme.warning : theme.error;
+                                rect.fillColor = isUndefined(source[j]) ? theme.warning : theme.error;
                             },
                             [Command.onElementLinkOut]() {
-                                circle.fillColor = datum.fill;
+                                rect.fillColor = datum.fill;
                             },
                             [Command.onElementNormal]() {
-                                circle.fillColor = datum.fill;
+                                rect.fillColor = datum.fill;
                             },
                             [Command.onElementError]() {
-                                circle.fillColor = theme.error;
+                                rect.fillColor = theme.error;
                             },
                             [Command.onElementLinked]() {
                                 source[j] = localID;
@@ -285,15 +272,23 @@ export default function XNodePort(cfg: XNodeBase): XElementFactory<XNodePortDef>
                             },
                         }),
                         getIntersections(item: XNode): XPoint[] {
-                            return circle.getIntersections(item);
+                            return rect.getIntersections(item);
                         }
                     });
+
+                    actionDispatcher('x-make-clickable', compound, compound);
+
+                    if (isOuter) {
+                        compound.bounds.leftCenter = p;
+                    } else {
+                        compound.bounds.rightCenter = p;
+                    }
 
                     point = finalPt;
                     portsElements.push(compound);
                     compound.data = {
                         id: localID,
-                        type: NODE_PORT,
+                        type: NODE_TYPE,
                         parent: finalCfg.id,
                         isOut: datum.isOuter,
                         linkable: true
@@ -304,9 +299,10 @@ export default function XNodePort(cfg: XNodeBase): XElementFactory<XNodePortDef>
                         context.removeElement(localID);
                         actionDispatcher(`${localID}-deleted`);
                     });
-                    isOuter && doPointer(circle, context);
+                    isOuter && doPointer(rect, context);
 
                     doLinkZone(compound, hookManager);
+                    doPointer(compound, context);
                     context.addElement(compound);
                 }
             }

@@ -2,7 +2,8 @@ import {XLightTheme} from "./modules/themes";
 import {PaperRenderer} from "./modules/renderers";
 import {XArrow, XArrowDef, XDefaultNode, XNodeDef, XNodePort, XNodePortDef} from "./modules/components";
 import {XBoardPlugin, XCopyPlugin, XDataChangePlugin, XDeletePlugin, XInteractivePlugin, XLinkerPlugin, XSelectionPlugin} from "./modules/plugins";
-import {XDiagram, XElementDef} from "./modules/core";
+import {HookActionEnum, XDiagram, XElementDef} from "./modules/core";
+import XFunctionPort, {XFunctionPortDef} from "./lib/components/XFunctionPort";
 
 document.body.style.width = '100%';
 document.body.style.height = '400px';
@@ -14,6 +15,7 @@ const xDiagram = new XDiagram(document.body, {
     catalog: [
         XDefaultNode({name: 'rounded-node', strokeWidth: 2, padding: 24, radius: 8}),
         XNodePort({name: 'port', strokeWidth: 2, padding: 24, radius: 8}),
+        XFunctionPort({name: 'function-port', strokeWidth: 2, padding: 24, radius: 8}),
         XArrow
     ],
     plugins: [
@@ -91,19 +93,24 @@ xDiagram.addElement<XNodePortDef>({
 });
 
 
-xDiagram.addElement<XNodePortDef>({
+xDiagram.addElement<XFunctionPortDef>({
     id: 5,
-    solver: 'port',
+    solver: 'function-port',
     text: 'Task-5',
     position: {
         x: 650,
         y: 300,
     },
-    in: 1,
-    out: 1
+    in: ["person", "cusotmer", "input2", "input3", "input4", "input5"],
+    out: ["output0"],
+    portTextSize: 14
 });
 
 xDiagram.addElement<XArrowDef>({solver: 'x-arrow', src: 2, trg: 1});
 xDiagram.addElement<XArrowDef>({solver: 'x-arrow', src: 2, trg: 'in:0:3'});
 xDiagram.addElement<XArrowDef>({solver: 'x-arrow', src: 2, trg: 'in:2:3'});
 
+xDiagram.getListener().action(HookActionEnum.ELEMENT_SELECTED, node=>{
+    console.log('Node selected')
+    console.log(node)
+})

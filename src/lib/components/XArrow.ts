@@ -96,7 +96,7 @@ const XArrow: XElementFactory = defineElement<XArrowDef>({
             }
         );
 
-        const rootEl = b.makeCompound({
+        const rootEl = b.makeInteractive({
             items: [path],
             command
         });

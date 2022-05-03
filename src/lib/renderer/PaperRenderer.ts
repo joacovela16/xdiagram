@@ -1,6 +1,7 @@
 import {Color, Group, PaperScope, Path, Point, PointText, Raster, Rectangle, Size} from "paper";
-import type {PathCommand, XBound, XBuilder, XCompoundDef, XEvent, XEventName, XItem, XNode, XPoint, XRaster, XShape, XSize, XText} from "../shared/XRender";
+import type {PathCommand, XBound, XBuilder, XInteractiveDef, XEvent, XEventName, XItem, XNode, XPoint, XRaster, XShape, XSize, XText} from "../shared/XRender";
 import type {Callable, XID} from "../shared/XTypes";
+
 
 class PSize implements XSize {
 
@@ -815,12 +816,10 @@ class PText extends PNode<paper.PointText> implements XText {
 }
 
 class PCompound extends PNode implements XNode {
-    private collapsibleDef: XCompoundDef;
+    private collapsibleDef: XInteractiveDef;
     private extensions: paper.Group;
 
-    // private base: PGroup;
-
-    constructor(def?: XCompoundDef) {
+    constructor(def: XInteractiveDef) {
         // el, extension
         super(new Group(), new Group());
         const base: XItem = this;
@@ -834,7 +833,6 @@ class PCompound extends PNode implements XNode {
             },
             ...def
         };
-
 
         this.mainContainer.addChild(extensions);
         this.extensions = extensions;
@@ -856,7 +854,6 @@ class PCompound extends PNode implements XNode {
     }
 }
 
-
 class PaperBuilder implements XBuilder {
     private project: paper.Project;
     private paperScope: paper.PaperScope;
@@ -869,8 +866,8 @@ class PaperBuilder implements XBuilder {
         this.project = paperScope.project;
     }
 
-    makeCompound(compose?: XCompoundDef): XNode {
-        return new PCompound(compose);
+    makeInteractive(def: XInteractiveDef): XNode {
+        return new PCompound(def);
     }
 
     fromSVG(svg: SVGElement | string, options?: any): XItem {

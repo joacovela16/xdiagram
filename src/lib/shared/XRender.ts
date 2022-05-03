@@ -121,7 +121,7 @@ export type XEvent = {
     stop(): void
 }
 
-export interface XCompoundDef {
+export interface XInteractiveDef {
     items: XItem[];
     getIntersections?: (item: XNode) => XPoint[];
     command?: (c: string, ...data: any) => void
@@ -328,7 +328,7 @@ export interface XText extends XItem {
 export type XBuilderFactory = (el: HTMLElement) => XBuilder;
 
 export interface XBuilder {
-    makeCompound(compose?: XCompoundDef): XNode
+    makeInteractive(def: XInteractiveDef): XNode
 
     makePoint(x: number, y: number): XPoint;
 

@@ -6,6 +6,7 @@ import {Command, HookActionEnum} from "../shared/Instructions";
 import {LinkedList} from "../shared/XList";
 
 const MAKE_INTERACTIVE: string = 'x-make-interactive';
+const MAKE_CLICKABLE: string = 'x-make-clickable';
 
 const XInteractivePlugin: XPluginDef = definePlugin({
     name: 'x-interactive-plugin',
@@ -14,6 +15,12 @@ const XInteractivePlugin: XPluginDef = definePlugin({
         const actionDispatcher = hook.dispatcher.action;
         const actionListener: (name: HookAction, f: Function) => Callable = hook.listener.action;
         const canvasStyle = context.element.style;
+
+        actionListener(MAKE_CLICKABLE, (node: XNode, base: XNode) => {
+            node.on('click', () => {
+                actionDispatcher(HookActionEnum.ELEMENT_SELECTED, base);
+            })
+        });
 
         actionListener(MAKE_INTERACTIVE, (node: XNode, base: XNode) => {
 
