@@ -101,7 +101,7 @@ xDiagram.addElement<XFunctionPortDef>({
         x: 650,
         y: 300,
     },
-    in: ["person", "cusotmer", "input2", "input3", "input4", "input5"],
+    in: ["person", "cusotmer", "input2", "input3", "input4", "input5", "input5"],
     out: ["output0"],
     portTextSize: 14
 });
