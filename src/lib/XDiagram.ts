@@ -12,6 +12,7 @@ export default class XDiagram {
 
     private readonly dispatcher: HookDispatcher;
     private readonly listener: HookListener;
+    private readonly elementMapStore: { [idx: XID]: Holder<XNode> };
 
     constructor(element: HTMLElement, options: XDiagramOptions) {
 
@@ -20,6 +21,7 @@ export default class XDiagram {
 
         const elementMapStore: { [idx: XID]: Holder<XNode> } = {};
         const elementListStore: LinkedList<XNode> = new LinkedList<XNode>();
+        this.elementMapStore = elementMapStore;
 
         const builder = options.renderer(element);
 
@@ -124,6 +126,10 @@ export default class XDiagram {
 
     addElement<T extends XElementDef = XElementDef>(node: T): void {
         this.dispatcher.action(HookActionEnum.ELEMENT_ADD, node);
+    }
+
+    getElement(id: XID): XNode | undefined {
+        return doOption(this.elementMapStore[id]).map(x => x.state).getOrElse(undefined);
     }
 
     destroy(): void {
