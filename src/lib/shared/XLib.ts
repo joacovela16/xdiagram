@@ -173,11 +173,12 @@ export function doIconHovering(iconItem: XItem, context: XContext, hoverColor?: 
     return group;
 }
 
-export function doLinkZone(bind: XNode, hookManager: HookManager): void {
+export function doLinkZone(bind: XNode, hookManager: HookManager, ref?:XNode): void {
     const actionDispatcher = hookManager.dispatcher.action;
-    doHover(bind,
-        () => actionDispatcher(HookActionEnum.LINK_ZONE_IN, bind),
-        () => actionDispatcher(HookActionEnum.LINK_ZONE_OUT, bind)
+    doHover(
+        bind,
+        () => actionDispatcher(HookActionEnum.LINK_ZONE_IN, ref || bind),
+        () => actionDispatcher(HookActionEnum.LINK_ZONE_OUT, ref || bind)
     );
 }
 
@@ -288,6 +289,7 @@ export function doLinker(
                     if (isDragging && source.id !== node.id) {
                         targetNode = node;
                         isValid = filterDispatcher(HookFilterEnum.ELEMENTS_CAN_LINK, true, source, node);
+                        console.log(node)
                         if (isValid) {
                             node.command(Command.onElementLinkIn);
                             line.strokeColor = theme.accent;

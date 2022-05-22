@@ -98,10 +98,10 @@ xDiagram.addElement<XFunctionPortDef>({
     solver: 'function-port',
     text: 'Task-5',
     position: {
-        x: 650,
+        x: 950,
         y: 300,
     },
-    in: ["person", "cusotmer", "input2", "input3", "input4", "input5", "input5"],
+    in: ["person", "cusotmer", "input2", "input3"],
     out: ["output0"],
     portTextSize: 14
 });

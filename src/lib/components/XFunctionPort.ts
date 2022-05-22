@@ -30,6 +30,7 @@ type XNodeBase = {
     strokeColor?: string;
     strokeWidth?: number;
     fillColor?: string;
+    makeKernelLinkable?: boolean;
 };
 
 type XNodePortBase = {
@@ -143,6 +144,7 @@ export default function XFunctionPort(cfg: XNodeBase): XElementFactory<XFunction
             const filterDispatcher = hookManager.dispatcher.filter;
             const theme: XTheme = context.theme;
 
+            const makeKernelLinkable = getOrElse(finalCfg.makeKernelLinkable, true);
             const position = finalCfg.position;
             const radius: number = getOrElse(finalCfg.radius, 10);
             const padding: number = getOrElse(finalCfg.padding, 10);
@@ -319,9 +321,26 @@ export default function XFunctionPort(cfg: XNodeBase): XElementFactory<XFunction
                         rootEl.moveTo(doSnap(point));
                         actionDispatcher(`${rootEl.id}-drag`, rootEl);
                         portsElements.forEach(x => actionDispatcher(`${x.id}-drag`, x));
+                    },
+                    [Command.onElementLinkIn]() {
+                        rectEl.strokeColor = theme.accent;
+                    },
+                    [Command.onElementLinkOut]() {
+                        rectEl.strokeColor = getOrElse(config.strokeColor, theme.primary);
+                    },
+                    [Command.onElementNormal]() {
+                        rectEl.strokeColor = getOrElse(config.strokeColor, theme.primary);
+                    },
+                    [Command.onElementLinked]() {
+                        rectEl.strokeColor = getOrElse(finalCfg.strokeColor, theme.primary);
+                    },
+                    [Command.onElementError]() {
+                        rectEl.strokeColor = theme.error;
                     }
+
                 }
             );
+
 
             const rootEl = b.makeInteractive({
                 items: [rectEl, textEl, ...portsElements],
@@ -330,6 +349,10 @@ export default function XFunctionPort(cfg: XNodeBase): XElementFactory<XFunction
                     return rectEl.getIntersections(shape);
                 }
             });
+
+            rectEl.id = finalCfg.id;
+            rectEl.data = {parent: finalCfg.id};
+            makeKernelLinkable && doLinkZone(rectEl, hookManager, rootEl);
 
             rootEl.id = finalCfg.id;
             rootEl.data = finalCfg;

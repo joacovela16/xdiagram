@@ -1,5 +1,5 @@
 import {Color, Group, PaperScope, Path, Point, PointText, Raster, Rectangle, Size} from "paper";
-import type {PathCommand, XBound, XBuilder, XInteractiveDef, XEvent, XEventName, XItem, XNode, XPoint, XRaster, XShape, XSize, XText} from "../shared/XRender";
+import type {PathCommand, XBound, XBuilder, XEvent, XEventName, XInteractiveDef, XItem, XNode, XPoint, XRaster, XShape, XSize, XText} from "../shared/XRender";
 import type {Callable, XID} from "../shared/XTypes";
 
 
@@ -700,18 +700,9 @@ class PShape extends PNode<paper.Path> implements XShape {
         }
     }
 
-
-    // getOffsetOf(point: XPoint): number {
-    //     return this.mainEl.getOffsetOf(PPoint.toPoint(point));
-    // }
-
     moveTo(point: XPoint): void {
         this.mainEl.moveTo(PPoint.toPoint(point));
     }
-
-    // addSegment(to: XPoint, handle1?: XPoint, handle2?: XPoint): void {
-    //     this.mainEl.add(new Segment(PPoint.toPoint(to), PPoint.toPoint(handle1), PPoint.toPoint(handle2)));
-    // }
 
     lineTo(point: XPoint): void {
         this.mainEl.add(PPoint.toPoint(point));
@@ -962,7 +953,7 @@ class PaperBuilder implements XBuilder {
     }
 }
 
-export default function PaperRenderer(element: HTMLElement) :XBuilder{
+export default function PaperRenderer(element: HTMLElement): XBuilder {
     const canvas = document.createElement('canvas');
     canvas.style.width = '100%'
     canvas.style.height = '100%'
