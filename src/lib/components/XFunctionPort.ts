@@ -174,10 +174,10 @@ export default function XFunctionPort(cfg: XNodeBase): XElementFactory<XFunction
             const maxPorts = Math.max(inNumber * portTextSize, outNumber * portTextSize) * 3;
             const textPaperBounds = textEl.bounds.clone();
             const tmpWidth = textPaperBounds.width + padding;
-            const tmpHeight = textPaperBounds.height * 2;
+            const tmpHeight = textPaperBounds.height +padding;
 
             textPaperBounds.width = tmpWidth;
-            textPaperBounds.height = Math.max(tmpHeight, maxPorts);
+            textPaperBounds.height = tmpHeight;//Math.max(tmpHeight, maxPorts);
             textPaperBounds.center = textEl.bounds.center;
 
             const rectEl = b.makeRect(textPaperBounds, radius);
@@ -189,7 +189,7 @@ export default function XFunctionPort(cfg: XNodeBase): XElementFactory<XFunction
 
 
             const DEFAULT_OFFSET: number = 10;
-            const distance = bounds.bottomLeft.getDistance(bounds.topLeft);
+            const distance = maxPorts;//bounds.bottomLeft.getDistance(bounds.topLeft);
 
             if (inNumber > 0) {
                 portsConf.push({
@@ -198,7 +198,7 @@ export default function XFunctionPort(cfg: XNodeBase): XElementFactory<XFunction
                     labels: innerDef,
                     src: bounds.topLeft.y,
                     trg: bounds.bottomLeft.y,
-                    pointRef: bounds.topLeft,
+                    pointRef: bounds.leftCenter.subtract(b.makePoint(0,maxPorts/2)),
                     fill: getOrElse(finalCfg.inColor, theme.primary),
                     xOffset: -DEFAULT_OFFSET,
                     yOffset: distance / (inNumber + 1),
@@ -215,7 +215,7 @@ export default function XFunctionPort(cfg: XNodeBase): XElementFactory<XFunction
                     labels: outerDef,
                     src: bounds.topRight.y,
                     trg: bounds.bottomRight.y,
-                    pointRef: bounds.topRight,
+                    pointRef: bounds.rightCenter.subtract(b.makePoint(0,maxPorts/2)),
                     fill: getOrElse(finalCfg.outColor, theme.secondary),
                     xOffset: DEFAULT_OFFSET,
                     yOffset: distance / (outNumber + 1),

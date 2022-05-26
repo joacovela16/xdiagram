@@ -2,7 +2,7 @@ import {cutSegment, doHover, doReceptor, doSnap, getOrElse, isDefined, isUndefin
 import type {XContext, XElementDef, XElementFactory, XID, XTheme} from "../shared/XTypes";
 import {Callable} from "../shared/XTypes";
 import {defineElement} from "../shared/XHelper";
-import type {XBuilder, XItem, XNode, XPoint} from "../shared/XRender";
+import type {XBuilder, XItem, XNode, XPoint, XShape} from "../shared/XRender";
 import {PathHelper} from "../shared/XRender";
 import {Command, HookActionEnum, HookFilterEnum} from "../shared/Instructions";
 import doReactive from "../shared/Reactive";
@@ -38,6 +38,42 @@ function isZero(n: number, epsilon: number = 0.05) {
     return n > -epsilon && n < epsilon;
 }
 
+abstract class ArrowHandler {
+    protected path: XShape;
+    protected config: XArrowDef;
+    protected context: XContext;
+    protected redraw: () => void;
+
+    constructor(path: XShape, config: XArrowDef, context: XContext) {
+        this.path = path;
+        this.config = config;
+        this.context = context;
+    }
+
+    abstract init(): void
+
+    abstract getSrcNode(): XNode
+
+    abstract getTrgNode(): XNode
+
+    setRedraw(handler: () => void): void {
+        this.redraw = handler;
+    }
+}
+
+class SteppedArrow extends ArrowHandler {
+    init(): void {
+    }
+
+    getSrcNode(): XNode {
+        return undefined;
+    }
+
+    getTrgNode(): XNode {
+        return undefined;
+    }
+}
+
 const XArrow: XElementFactory = defineElement<XArrowDef>({
     name: 'x-arrow',
     onInit(context, hookManager) {
@@ -56,9 +92,10 @@ const XArrow: XElementFactory = defineElement<XArrowDef>({
         let start_arrow_diff = PRIMARY_LENGTH;
         let end_arrow_diff = PRIMARY_LENGTH;
 
+
         const pathTool = b.makePath();
         pathTool.visible = false;
-        isUndefined(config.stages) && (config.stages = []);
+        config.stages || (config.stages = []);
 
         const initialStages: Coord[] = config.stages;
 
@@ -81,6 +118,8 @@ const XArrow: XElementFactory = defineElement<XArrowDef>({
         const stages: XStage[] = []
         const tools: XDraw[] = []
         const path = b.makePath();
+
+        const renderer: ArrowHandler = new SteppedArrow(path, config, context);
 
         const command = doReceptor(
             {
@@ -610,9 +649,7 @@ const XArrow: XElementFactory = defineElement<XArrowDef>({
 
             if (stagesCount === 2) {
                 pathTool.begin();
-                // linked to src
                 if (srcRefNode) {
-                    // pathTool.moveTo(srcCenter);
                     pathTool.addCommand(PathHelper.moveTo(srcCenter))
                     if (trgRefNode) {
                         pathTool.addCommand(PathHelper.lineTo(trgCenter));
@@ -631,7 +668,6 @@ const XArrow: XElementFactory = defineElement<XArrowDef>({
                 }
 
                 if (trgRefNode) {
-                    // pathTool.moveTo(trgCenter);
                     pathTool.addCommand(PathHelper.moveTo(trgCenter));
 
                     if (srcRefNode) {
