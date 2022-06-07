@@ -15,32 +15,36 @@ const XSelectionPlugin: XPluginDef = definePlugin({
         actionListener(HookActionEnum.ELEMENT_SELECTED, showBox);
         actionListener(HookActionEnum.ELEMENT_START_DRAG, hideBox);
         actionListener(HookActionEnum.BOARD_CLICK, hideBox);
-        actionListener(HookActionEnum.ELEMENT_DELETED,  hideBox);
+        actionListener(HookActionEnum.ELEMENT_DELETED, hideBox);
 
         function doBounder() {
-            let shape: XNode;
-            const clean = () => {
-                shape && shape.remove();
-                shape = null;
-            }
+            const shape = b.makeRect();
+            context.getLayer('back').addChild(shape);
+            shape.dashArray = [2, 2];
+            shape.strokeWidth = 1;
+            shape.radius = 5;
+            shape.fillColor = undefined;
+            shape.strokeColor = context.theme.primaryFocus;
+            shape.visible=false;
+
             return {
                 build(point: XPoint, size: XSize, parent: XNode): void {
-                    clean();
-                    shape = b.makeRect(b.makeBound(point.x, point.y, size.width, size.height));
-                    shape.strokeWidth = 1;
-                    shape.strokeColor = context.theme.primaryFocus;
-                    shape.position = point;
-                    shape.dashArray = [2, 2];
-                    parent.addExtension(shape);
+                    shape.visible = true;
+                    console.log(parent.center)
+                    shape.center = parent.center;
+                    shape.size = size;
                 },
-                clean
+                clean() {
+                    shape.visible = false;
+                }
             }
         }
 
         function showBox(node: XNode) {
             const nodeBounds = node.bounds;
             const newSize = nodeBounds.size.add(10);
-
+            console.clear()
+            console.log(nodeBounds.center)
             box.build(nodeBounds.center, newSize, node);
 
             if (lastSelection) {

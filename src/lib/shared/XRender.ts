@@ -21,7 +21,6 @@ export type PathCommand =
     [PathInstruction, number, number, number, number, number, number, number] |
     [PathInstruction];
 
-
 export class PathHelper {
     static singleNumber(c: PathInstruction, point: number): PathCommand {
         return [c, point];
@@ -107,7 +106,7 @@ export class PathHelper {
         return ['A', point1.x, point1.y, point2.x, point2.y, point3.x, point3.y, r];
     }
 
-    static close():PathCommand {
+    static close(): PathCommand {
         return ['Z'];
     }
 }
@@ -122,7 +121,7 @@ export type XEvent = {
 }
 
 export interface XInteractiveDef {
-    items: XItem[];
+    items?: XItem[];
     getIntersections?: (item: XNode) => XPoint[];
     command?: (c: string, ...data: any) => void
 }
@@ -239,7 +238,7 @@ export interface XBound {
 
     contains(rect: XBound): boolean
 
-    intersects(rect: XBound, epsilon?: number): boolean
+    // intersects(rect: XBound, epsilon?: number): boolean
 
     intersect(rect: XBound): XBound
 
@@ -263,6 +262,7 @@ export interface XItem {
     fillColor: string;
     bounds: XBound;
     position: XPoint;
+    center: XPoint;
     dashArray: number[];
     data: XData;
 
@@ -276,7 +276,7 @@ export interface XItem {
 
     addChildren(items: this[]);
 
-    addChild(items: this);
+    addChild(item: this);
 
     on(name: XEventName, handler: (e: XEvent) => void): Callable;
 
@@ -295,8 +295,21 @@ export interface XItem {
 
 export interface XNode extends XItem {
     getIntersections(item: this): XPoint[];
-    addExtension(item: this): void
+
     command(name: string, ...data: any): void
+}
+
+export interface XRect extends XNode {
+    size: XSize
+    radius:number;
+}
+
+export interface XCircle extends XNode {
+    radius: number;
+}
+
+export interface XLine extends XNode {
+    setExtremes(start?: XPoint, end?: XPoint): void
 }
 
 export interface XShape extends XNode {
@@ -310,13 +323,14 @@ export interface XShape extends XNode {
 }
 
 export interface XRaster extends XItem {
+    size: XSize;
     setPixel(x: number, y: number, color: string): void;
 
     setPixel(x: number, y: number, color: string): void;
 }
 
 export interface XText extends XItem {
-    point: XPoint;
+    position: XPoint;
     content: string
     fontFamily: string;
     fontWeight: string | number;
@@ -328,7 +342,10 @@ export interface XText extends XItem {
 export type XBuilderFactory = (el: HTMLElement) => XBuilder;
 
 export interface XBuilder {
-    makeInteractive(def: XInteractiveDef): XNode
+
+    addItems(...children: XItem[]): void;
+
+    makeInteractive(def: XInteractiveDef): XNode;
 
     makePoint(x: number, y: number): XPoint;
 
@@ -342,21 +359,19 @@ export interface XBuilder {
 
     makeGroup(children: XItem[]): XItem;
 
-    makeRect(point: XPoint, size: XSize): XNode;
+    makeRect(): XRect;
 
-    makeRect(bound: XBound, radius?: number): XNode;
+    makeCircle(): XCircle;
 
-    makeCircle(point: XPoint, radius: number): XNode;
+    makeLine(): XLine;
 
-    makeLine(from: XPoint, to: XPoint): XNode;
-
-    makeText(point: XPoint, content?: string): XText;
+    makeText(): XText;
 
     makePath(): XShape;
 
-    makeRaster(size: XSize, position?: XPoint): XRaster;
+    makeRaster(): XRaster;
 
-    fromSVG(svg: SVGElement | string, options?: any): XItem;
+    fromSVG(svg: SVGGraphicsElement | string, options?: any): XItem;
 
     viewSize(): XSize;
 

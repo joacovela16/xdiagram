@@ -53,7 +53,7 @@ export function idGen() {
     return Math.floor(Date.now() * Math.random());
 }
 
-export function doSnap(p: XPoint, snap: number = 10) {
+export function doSnap(p: XPoint, snap: number = 1) {
     return p.divide(snap).round().multiply(snap);
 }
 
@@ -173,7 +173,7 @@ export function doIconHovering(iconItem: XItem, context: XContext, hoverColor?: 
     return group;
 }
 
-export function doLinkZone(bind: XNode, hookManager: HookManager, ref?:XNode): void {
+export function doLinkZone(bind: XItem, hookManager: HookManager, ref?: XItem): void {
     const actionDispatcher = hookManager.dispatcher.action;
     doHover(
         bind,
@@ -286,10 +286,10 @@ export function doLinker(
         listeners
             .push(
                 actionListener(HookActionEnum.LINK_ZONE_IN, (node: XNode) => {
+
                     if (isDragging && source.id !== node.id) {
                         targetNode = node;
                         isValid = filterDispatcher(HookFilterEnum.ELEMENTS_CAN_LINK, true, source, node);
-                        console.log(node)
                         if (isValid) {
                             node.command(Command.onElementLinkIn);
                             line.strokeColor = theme.accent;
@@ -304,13 +304,14 @@ export function doLinker(
         listeners
             .push(
                 actionListener(HookActionEnum.LINK_ZONE_OUT, (node: XNode) => {
+                    console.log(node)
                     node.command(Command.onElementLinkOut);
                     line.strokeColor = theme.primary;
                     targetNode = null;
+                    console.log('out')
                 })
             );
     }
-
 
     return () => {
         line.remove();
@@ -320,7 +321,7 @@ export function doLinker(
     }
 }
 
-export  function doIconTool(name: string, handler: (context: XContext, hook: HookManager) => XIconTool): XPluginDef {
+export function doIconTool(name: string, handler: (context: XContext, hook: HookManager) => XIconTool): XPluginDef {
     return definePlugin({
         name,
         plugin: (context, hook) => {
@@ -365,4 +366,27 @@ export  function doIconTool(name: string, handler: (context: XContext, hook: Hoo
             }
         }
     });
+}
+
+export function pointQuadrant(point: XPoint, center: XPoint): "TL" | "TR" | "BL" | "BR" {
+    if (point.x >= center.x && point.y <= center.y) {
+        return "TR"
+    } else if (point.x <= center.x && point.y <= center.y) {
+        return "TL"
+    } else if (point.x <= center.x && point.y >= center.y) {
+        return "BL";
+    } else {
+        return "BR";
+    }
+}
+
+export function pointIsUp(point: XPoint, center: XPoint): boolean {
+    const quadrant = pointQuadrant(point, center);
+    switch (quadrant) {
+        case "TL":
+        case "TR":
+            return true;
+        default:
+            return false;
+    }
 }

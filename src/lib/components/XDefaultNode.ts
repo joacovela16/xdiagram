@@ -1,9 +1,9 @@
-import {doLinkZone, doNumberSnap, doReceptor, doSnap, getOrElse} from "../shared/XLib";
+import {doLinkZone, doNumberSnap, doReceptor, getOrElse} from "../shared/XLib";
 import {HookManager, type XContext, XElementDef, type XElementFactory, type XTheme} from "../shared/XTypes";
 import type {XBuilder, XNode, XPoint} from "../shared/XRender";
 import {Command, HookActionEnum, HookFilterEnum} from "../shared/Instructions";
 import {defineElement} from "../shared/XHelper";
-
+import {XItem} from "../shared/XRender";
 
 interface XNodeRectDef {
     name: string;
@@ -33,7 +33,7 @@ export type XNodeDef = {
 export default function XDefaultNode(conf: XNodeRectDef): XElementFactory {
     return defineElement<XNodeDef>({
         name: conf.name,
-        build(context: XContext, hookManager:HookManager, cfg: XNodeDef): XNode {
+        build(context: XContext, hookManager: HookManager, cfg: XNodeDef): XNode {
             const config: XNodeDef = {...cfg, ...conf};
             const position: Coord = config.position;
             const b: XBuilder = context.builder;
@@ -43,23 +43,10 @@ export default function XDefaultNode(conf: XNodeRectDef): XElementFactory {
 
             const radius: number = getOrElse(config.radius, 0);
             const padding: number = getOrElse(config.padding, 0);
-            const textPoint = b.makePoint(position.x, position.y);
+            const initialPosition = b.makePoint(position.x, position.y);
 
-            const textEl = b.makeText(textPoint, getOrElse(config.text, "..."));
-            textEl.locked = true;
-            textEl.fontSize = getOrElse(config.fontSize, 28);
-            textEl.fillColor = getOrElse(config.textColor, theme.baseContent);
-
-            const textPaperBounds = textEl.bounds.clone();
-            textPaperBounds.height = doNumberSnap(textPaperBounds.height * 1.5);
-            textPaperBounds.width = doNumberSnap(textPaperBounds.width + padding);
-            textPaperBounds.center = textEl.bounds.center;
-
-            const rectEl = b.makeRect(textPaperBounds, radius);
-            rectEl.bounds.center = textPaperBounds.center;
-            rectEl.strokeColor = getOrElse(config.strokeColor, theme.primary);
-            rectEl.strokeWidth = getOrElse(config.strokeWidth, 0);
-            rectEl.fillColor = getOrElse(config.fillColor, theme.primaryContent);
+            const textEl = b.makeText();
+            const rectEl = b.makeRect();
 
             const command = doReceptor(
                 {
@@ -87,24 +74,47 @@ export default function XDefaultNode(conf: XNodeRectDef): XElementFactory {
                         }
                     },
                     [Command.elementDrag](point: XPoint) {
-                        rootEl.moveTo(doSnap(point));
+                        rootEl.moveTo(point);
                         actionDispatcher(`${rootEl.id}-drag`, rootEl);
                     }
                 }
             );
 
-            const rootEl = b.makeInteractive({
+            const rootEl: XNode = b.makeInteractive({
                 items: [rectEl, textEl],
                 command,
                 getIntersections(shape) {
-                    return rectEl.getIntersections(shape);
+                    const r: XNode = rectEl;
+                    return r.getIntersections(shape);
                 }
             });
 
-            rootEl.id = config.id;
-            rootEl.data = config;
-            config.linkable = true;
             context.getLayer('middle').addChild(rootEl);
+
+            textEl.locked = true;
+            textEl.content = getOrElse(config.text, "...");
+            textEl.fontSize = getOrElse(config.fontSize, 28);
+            textEl.fillColor = getOrElse(config.textColor, theme.baseContent);
+
+            const textPaperBounds = textEl.bounds.clone();
+            textPaperBounds.height = doNumberSnap(textPaperBounds.height + padding);
+            textPaperBounds.width = doNumberSnap(textPaperBounds.width * 1.2);
+            textPaperBounds.center = textEl.bounds.center;
+
+            rectEl.size = textPaperBounds.size;
+            rectEl.radius = radius;
+            rectEl.strokeColor = getOrElse(config.strokeColor, theme.primary);
+            rectEl.strokeWidth = getOrElse(config.strokeWidth, 2);
+            rectEl.fillColor = getOrElse(config.fillColor, theme.primaryContent);
+
+            rootEl.id = config.id;
+            rootEl.position = initialPosition;
+            rootEl.data = config;
+
+            rectEl.center = initialPosition;
+            textEl.center = initialPosition;
+
+            config.linkable = true;
 
             doLinkZone(rootEl, hookManager);
             actionDispatcher("x-make-interactive", rootEl, rootEl);

@@ -797,11 +797,11 @@ class PText extends PNode<paper.PointText> implements XText {
         this.mainEl.leading = value;
     }
 
-    get point(): XPoint {
+    get position(): XPoint {
         return PPoint.fromPoint(this.mainEl.point);
     }
 
-    set point(value: XPoint) {
+    set position(value: XPoint) {
         this.mainEl.point = PPoint.toPoint(value);
     }
 }
@@ -855,6 +855,9 @@ class PaperBuilder implements XBuilder {
         paperScope.setup(canvas);
         this.paperScope = paperScope;
         this.project = paperScope.project;
+    }
+
+    addItems(...children: XItem[]): void {
     }
 
     makeInteractive(def: XInteractiveDef): XNode {

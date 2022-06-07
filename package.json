@@ -14,14 +14,17 @@
     "clean": "rimraf components && rimraf plugins && rimraf themes&& rimraf dist && rimraf index.d.ts"
   },
   "dependencies": {
-    "paper": "0.12.15"
+    "kld-intersections": "0.7.0",
+    "paper": "0.12.15",
+    "tiny-svg": "2.2.3"
   },
   "devDependencies": {
+    "@flatten-js/core": "1.3.4",
     "rimraf": "3.0.2",
     "tslib": "2.4.0",
-    "typescript": "4.6.4",
+    "typescript": "4.7.2",
     "vite": "2.9.9",
-    "zx": "6.1.0"
+    "zx": "6.2.1"
   },
   "files": [
     "index.d.ts",

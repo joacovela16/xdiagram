@@ -1,11 +1,17 @@
-import type {PathCommand, XBound, XBuilder, XCompoundDef, XEvent, XEventName, XId, XItem, XNode, XPoint, XRaster, XShape, XSize, XText} from "../shared/XRender";
+import type {PathCommand, XBound, XBuilder, XCircle, XEvent, XEventName, XInteractiveDef, XItem, XLine, XNode, XPoint, XRaster, XRect, XShape, XSize, XText} from "../shared/XRender";
+import type {Callable, XData, XID} from "../shared/XTypes";
 
-import type {Circle, Element as SVGEl, Svg} from '@svgdotjs/svg.js'
-import {Element, Line, Path, Rect, SVG, Text} from "@svgdotjs/svg.js";
 import Flatten from '@flatten-js/core'
-import type {Callable} from "../shared/XTypes";
+import {Intersection, Shapes} from "kld-intersections"
+import {appendTo, attr, clone, create, createTransform, innerSVG, off, on, transform} from "tiny-svg";
+import {LinkedList} from "../shared/XList";
 
-const {Box, circle, Relations, line, point} = Flatten;
+const {Box, Relations, point} = Flatten;
+
+type Context = {
+    mousemove: LinkedList<Callable>,
+    mouseup: LinkedList<Callable>,
+};
 
 class SPoint implements XPoint {
 
@@ -21,7 +27,6 @@ class SPoint implements XPoint {
         return [this.x, this.y];
     }
 
-
     get length(): number {
         return Math.sqrt(this.x * this.x + this.y * this.y);
     }
@@ -33,10 +38,11 @@ class SPoint implements XPoint {
     add(number: number): XPoint;
     add(point: this): XPoint;
     add(number: number | this): XPoint {
+        const me = this;
         if (typeof number === 'number') {
-            return new SPoint(this.x + number, this.y + number)
+            return new SPoint(me.x + number, me.y + number)
         }
-        return new SPoint(this.x + number.x, this.y + number.y);
+        return new SPoint(me.x + number.x, me.y + number.y);
     }
 
     ceil(): XPoint {
@@ -204,7 +210,6 @@ class SSize implements XSize {
         return new SSize(this.width - number.width, this.height - number.height);
     }
 
-
 }
 
 class SBound implements XBound {
@@ -261,8 +266,8 @@ class SBound implements XBound {
     }
 
     set center(value: XPoint) {
-        this.x = value.x - this.width / 2;
-        this.y = value.y - this.height / 2;
+        this.x = value.x - (this.width / 2);
+        this.y = value.y - (this.height / 2);
     }
 
     get left(): number {
@@ -352,7 +357,6 @@ class SBound implements XBound {
         this.y = value.y;
     }
 
-
     clone(): XBound {
         return new SBound(this.x, this.y, this.width, this.height);
     }
@@ -393,13 +397,9 @@ class SBound implements XBound {
         const box1 = SBound.toBox(rect);
         const box0 = SBound.toBox(this);
         const merge = box0.merge(box1);
+        // ShapeInfo.rectangle({x: this.x, y: this.y, w: this.width, h: this.height})
+        // ShapeInfo.rectangle({x: rect.x, y: rect.y, w: rect.width, h: rect.height})
         return SBound.toBound(merge);
-    }
-
-    intersects(rect: XBound, epsilon?: number): boolean {
-        const box1 = SBound.toBox(rect);
-        const box0 = SBound.toBox(this);
-        return box0.intersect(box1);
     }
 
     scale(amount: number): XBound;
@@ -422,36 +422,99 @@ class SBound implements XBound {
 
 }
 
-class SItem<T extends SVGEl = SVGEl> implements XItem {
-    id: XId;
+class SItem<T extends SVGGraphicsElement = SVGGraphicsElement> implements XItem {
+    id: XID;
     locked: boolean;
-    data: object;
-    private _dashArray: number[];
-    private _fillColor: string;
-    private _position: XPoint;
-    private _strokeColor: string;
-    private _strokeWidth: number;
-    private _visible: boolean;
+    data: XData;
 
-    protected rootEl: SVGEl;
-    protected mainEl: T;
-    protected containerEl?: SVGEl;
+    protected _dashArray: number[];
+    protected _fillColor: string;
+    protected _strokeColor: string;
+    protected _strokeWidth: number;
+    protected _visible: boolean;
+    protected _bounds: XBound;
+    protected _position: XPoint;
+    protected _size: XSize;
 
-    constructor(main: T, container?: SVGEl) {
-        this.mainEl = main;
+    protected mainEl: SVGElement;
+    protected localEl: T;
+    protected containerEl?: SVGElement;
+
+    constructor(local: T, container?: SVGElement) {
+
+        this.localEl = local;
         this.containerEl = container;
         this.data = new Map<string, any>();
+        this._position = new SPoint(0, 0);
+
         if (container) {
-            container.add(main);
-            this.rootEl = container;
+            appendTo(local, container);
+            this.mainEl = container;
         } else {
-            this.rootEl = main;
+            this.mainEl = local;
         }
+
+    }
+
+    protected calculateSize() {
+        const box = this.getBox();
+        const tmp = new SSize(box.width, box.height);
+        this._size = tmp;
+        this.bounds.size = tmp;
+    }
+
+    get size(): XSize {
+        if (this._size)
+            return this._size;
+
+        this.calculateSize();
+        return this._size;
+    }
+
+    set size(value: XSize) {
+        this._size = value;
+        this.bounds.size = value;
+        this.draw();
+    }
+
+    protected draw(): void {
+        const p = this._position;
+        const svgTransform = createTransform();
+        svgTransform.setTranslate(p.x, p.y);
+        transform(this.mainEl, svgTransform);
+    }
+
+    get position(): XPoint {
+        return this._position;
+    }
+
+    set position(value: XPoint) {
+        this._position = value;
+        this.updateBound();
+        this.draw();
+    }
+
+    protected getBox(): DOMRect {
+        return this.localEl.getBoundingClientRect();
+    }
+
+    protected updateBound(): void {
+        const b = this.bounds;
+        b.point = this._position;
     }
 
     get bounds(): XBound {
-        const box = this.mainEl.bbox();
-        return new SBound(box.x, box.y, box.width, box.height);
+
+        const box = this.getBox();
+        const size = this.size;
+        const b = new SBound(box.left, box.top, box.width || size.width, box.height || size.height);
+        this._bounds = b;
+
+        return b;
+    }
+
+    set bounds(value: XBound) {
+        this._bounds = value;
     }
 
     get dashArray(): number[] {
@@ -460,7 +523,7 @@ class SItem<T extends SVGEl = SVGEl> implements XItem {
 
     set dashArray(value: number[]) {
         this._dashArray = value;
-        this.mainEl.attr('stroke-dasharray', value.join(' '));
+        attr(this.localEl, 'stroke-dasharray', value.join(','));
     }
 
     get fillColor(): string {
@@ -469,17 +532,23 @@ class SItem<T extends SVGEl = SVGEl> implements XItem {
 
     set fillColor(value: string) {
         this._fillColor = value;
-        this.mainEl.fill(value);
+        attr(this.localEl, 'fill', value || 'none');
     }
 
-    get position(): XPoint {
-        const mainEl = this.mainEl.bbox();
-        return new SPoint(mainEl.x, mainEl.y);
+    get center(): XPoint {
+        return this.bounds.center;
     }
 
-    set position(value: XPoint) {
-        this._position = value;
-        this.mainEl.move(value.x, value.y);
+    set center(value: XPoint) {
+        this.doCenter(value);
+    }
+
+    protected doCenter(value: XPoint) {
+        const bound = this.bounds;
+        bound.point = value;
+        bound.center = value;
+        this._position = bound.point;
+        this.draw();
     }
 
     get strokeColor(): string {
@@ -488,7 +557,7 @@ class SItem<T extends SVGEl = SVGEl> implements XItem {
 
     set strokeColor(value: string) {
         this._strokeColor = value;
-        this.mainEl.stroke(value);
+        attr(this.localEl, "stroke", value);
     }
 
     get strokeWidth(): number {
@@ -497,7 +566,7 @@ class SItem<T extends SVGEl = SVGEl> implements XItem {
 
     set strokeWidth(value: number) {
         this._strokeWidth = value;
-        this.mainEl.attr('stroke-width', value);
+        attr(this.localEl, 'stroke-width', value);
     }
 
     get visible(): boolean {
@@ -507,48 +576,45 @@ class SItem<T extends SVGEl = SVGEl> implements XItem {
     set visible(value: boolean) {
         this._visible = value;
         if (value) {
-            this.mainEl.hide()
+            attr(this.mainEl, 'visibility', 'initial');
         } else {
-            this.mainEl.show();
+            attr(this.mainEl, 'visibility', 'hidden');
         }
     }
 
-    addChild(items: this) {
-        this.mainEl.add(items.rootEl);
+    addChild(item: this) {
+        appendTo(item.mainEl, this.localEl);
     }
 
     addChildren(items: this[]) {
-        const mainEl = this.mainEl;
-        items.forEach(x => mainEl.add(x.rootEl));
+        const mainEl = this.localEl;
+        items.forEach(x => appendTo(x.mainEl, mainEl));
     }
 
     clone(): XItem {
-        const container = this.containerEl.clone();
-        container.clear();
-        return new SItem(this.mainEl.clone(), container);
+
+        const container = clone(this.containerEl);
+        // container.clear();
+        return new SItem(clone(this.localEl), container);
     }
 
     contains(point: XPoint): boolean {
-        return this.bounds.contains(point);
+        return this._bounds.contains(point);
     }
 
     on(name: XEventName, handler: (e: XEvent) => void): Callable {
         const me = this
         const eventName = SItem.mapEventName(name);
         let lastPoint: XPoint;
-        const calculateDelta = (base: XPoint) => {
-            const tmp = lastPoint;
-            lastPoint = base;
-            return tmp ? base.subtract(tmp) : base;
-        };
 
         const effectiveHandler = (e: any) => {
-
-            const p = new SPoint(e.x, e.y);
-            console.log(e)
+            const sPoint = new SPoint(e.x, e.y);
+            lastPoint || (lastPoint = sPoint);
+            const delta = new SPoint(e.movementX, e.movementY);
+            // lastPoint = sPoint;
             const event: XEvent = {
-                point: p,
-                delta: new SPoint(e.movementX, e.movementY),
+                point: sPoint,
+                delta,
                 target: me,
                 stop() {
                     e.stopPropagation();
@@ -563,8 +629,9 @@ class SItem<T extends SVGEl = SVGEl> implements XItem {
             };
             handler(event);
         };
-        me.mainEl.on(eventName, effectiveHandler);
-        return () => me.mainEl.off(eventName, effectiveHandler);
+        on(me.localEl, eventName, effectiveHandler)
+
+        return () => off(me.localEl, eventName, effectiveHandler);
     }
 
     private static mapEventName(name: XEventName): string {
@@ -574,13 +641,15 @@ class SItem<T extends SVGEl = SVGEl> implements XItem {
     }
 
     remove(): void {
-        this.rootEl.remove();
+        this.mainEl.remove();
     }
 
     rotate(angle: number, center?: XPoint): void {
         const x = center && center.x;
         const y = center && center.y;
-        this.rootEl.rotate(angle, x, y);
+        // this.rootEl.rotate(angle, x, y);
+        const svgTransform = transform(this.mainEl);
+        svgTransform.setRotate(angle, x, y);
     }
 
     scale(scale: number, center?: XPoint): void;
@@ -590,192 +659,240 @@ class SItem<T extends SVGEl = SVGEl> implements XItem {
         if (typeof x === 'number' && y && typeof y === 'number') {
             const cx = z && z.x;
             const cy = z && z.y;
-            this.rootEl.scale(x, y, cx, cy);
+            // this.rootEl.scale(x, y, cx, cy);
+            const svgTransform = transform(this.mainEl);
+            svgTransform.setScale(cx, cy);
         } else if (typeof x === 'number' && y && typeof y !== 'number') {
             const cx = y && y.x;
             const cy = y && y.y;
-            this.rootEl.scale(x, x, cx, cy);
+            // this.rootEl.scale(x, x, cx, cy);
+            const svgTransform = transform(this.mainEl);
+            svgTransform.setScale(cx, cy);
         }
     }
 
     sendToBack(): void {
-        this.rootEl.back();
+        // this.rootEl.back();
+
     }
 
     sendToFront(): void {
-        this.rootEl.front();
+        // this.rootEl.front();
     }
 
-    moveTo(delta: XPoint): void {
-        this.rootEl.center(delta.x, delta.y);
+    moveTo(position: XPoint): void {
+        this.position = position;
     }
 
     moveBy(delta: XPoint): void {
-        this.rootEl.translate(delta.x, delta.y)
+        this._position = this._position.add(delta);
+        this.draw();
     }
 }
 
-abstract class SNode<T extends SVGEl, S extends Flatten.Shape> extends SItem<T> implements XNode {
-    private extensions: SVGEl;
+abstract class SNode<T extends SVGGraphicsElement> extends SItem<T> implements XNode {
+    private extensions: SVGElement;
 
-    constructor(draw: Svg, item: T) {
-        super(item, draw.group());
-        this.extensions = draw.group();
-        this.containerEl.add(this.extensions);
+    protected constructor(item: T) {
+        super(item, create("g"));
+        this.extensions = create("g");
+        appendTo(this.extensions, this.containerEl);
     }
 
     addExtension(item: this): void {
-        this.extensions.add(item.rootEl);
+        appendTo(item.mainEl, this.extensions)
     }
 
     command(name: string, ...data: any): void {
     }
 
-    abstract shape(): S
+    abstract shape(): any
 
-    abstract getIntersections(item: this): XPoint[]
+    getIntersections(item: this): XPoint[] {
+        const result = Intersection.intersect(this.shape(), item.shape());
+        return ((result && result.points) || []).map(p => new SPoint(p.x, p.y));
+    }
 
 }
 
-class SCircle extends SNode<Circle, Flatten.Circle> {
-    constructor(draw: Svg, x: number, y: number, radius: number) {
-        super(draw, draw.circle(radius));
-        this.position = new SPoint(x, y);
+class SCircle extends SNode<SVGCircleElement> implements XCircle {
+    private _radius: number;
+
+    constructor() {
+        super(create('circle'));
+        attr(this.localEl, {cx:0, cy: 0})
     }
 
-    shape(): Flatten.Circle {
+    get radius(): number {
+        return this._radius;
+    }
+
+    set radius(value: number) {
+        this._radius = value;
+        attr(this.localEl, {'r': value});
+        this.draw();
+    }
+
+
+    shape(): any {
         const position = this.position;
-        return circle(point(position.x, position.y), this.mainEl.attr('r'));
-    }
-
-    getIntersections(item: this): XPoint[] {
-        const node: SNode<SVGEl, Flatten.Shape> = item;
-        const points = this.shape().intersect(node.shape());
-        return points.map(x => new SPoint(x.x, x.y));
+        return Shapes.circle(position.x, position.y, this._radius);
     }
 }
 
-class SLine extends SNode<Line, Flatten.Line> {
+class SLine extends SNode<SVGLineElement> implements XLine {
+    private from: XPoint;
+    private to: XPoint;
 
-    constructor(draw: Svg, from: XPoint, to: XPoint) {
-        super(draw, draw.line([[from.x, from.y], [to.x, to.y]]));
+    constructor() {
+        super(create('line'));
     }
 
-    getIntersections(item: this): XPoint[] {
-        const node: SNode<SVGEl, Flatten.Shape> = item;
-        const points = this.shape().intersect(node.shape());
-        return points.map(x => new SPoint(x.x, x.y));
+    setExtremes(start?: XPoint, end?: XPoint): void {
+        const me = this;
+        if (start) {
+            me.from = start;
+        }
+
+        if (end) {
+            me.to = end;
+        }
+
+        const from = me.from;
+        const to = me.to;
+        if (from && to) {
+            attr(me.localEl, {x1: from.x, y1: from.y, x2: to.x, y2: to.y});
+        }
     }
 
-    shape(): Flatten.Line {
-        const mainEl = this.mainEl;
-        const x1: number = mainEl.attr('x1')
-        const y1: number = mainEl.attr('y1')
+    shape(): any {
+        const from = this.from;
+        const to = this.to;
+        const x1: number = from.x
+        const y1: number = from.y;
 
-        const x2: number = mainEl.attr('x2')
-        const y2: number = mainEl.attr('y2')
-        return line(point(x1, y1), point(x2, y2));
+        const x2: number = to.x;
+        const y2: number = to.y;
+        return Shapes.line(x1, y1, x2, y2);
     }
 }
 
-class SRect extends SNode<Rect, Flatten.Box> {
+class SRect extends SNode<SVGRectElement> implements XRect {
+    private _radius: number;
 
-    constructor(draw: Svg, x: number, y: number, width: number, height: number, radius: number) {
-        super(draw, draw.rect(width, height).radius(radius));
-        this.position = new SPoint(x, y);
+    constructor() {
+        super(create('rect'));
     }
 
-    getIntersections(item: this): XPoint[] {
-        const nodeShape: Flatten.Shape = item.shape();
-        const points = this.shape().toSegments().flatMap(x => x.intersect(nodeShape));
-        return points.map(x => new SPoint(x.x, x.y));
+    get radius(): number {
+        return this._radius;
     }
 
-    shape(): Flatten.Box {
-        const bounds = this.bounds;
-        return SBound.toBox(bounds);
+    set radius(value: number) {
+        this._radius = value;
+        this.calculateSize();
+        this.draw();
+    }
+
+    protected draw() {
+        const r = this.radius;
+        r && attr(this.localEl, 'rx', r);
+
+        const xSize = this.size;
+        xSize && attr(this.localEl, {width: xSize.width, height: xSize.height});
+        super.draw();
+    }
+
+    shape(): any {
+        const me = this;
+        const bounds = me.bounds;
+        const topLeft = bounds.topLeft;
+        const s = bounds.size;
+        return Shapes.rectangle(topLeft.x, topLeft.y, s.width, s.height);
     }
 }
 
 class SGroup extends SItem {
-    constructor(draw: Svg) {
-        super(draw.group());
+    constructor() {
+        super(create('g'));
     }
 }
 
-class SText extends SItem<Text> implements XText {
+class SText extends SItem<SVGTextElement> implements XText {
 
-    constructor(draw: Svg, content: string) {
-        super(draw.text(content));
-        // @ts-ignore
-        this.mainEl.css('user-select', 'none')
+    constructor() {
+        super(create('text'));
+        attr(this.mainEl, {'user-select': "none"});
+    }
+
+    get center(): XPoint {
+        return super.center;
+    }
+
+    set center(value: XPoint) {
+        const bound = this.bounds;
+        this._position = new SPoint(-bound.width / 2, bound.height * 0.3);
+        this.draw();
     }
 
     get content(): string {
-        return this.mainEl.text();
+        return this.localEl.textContent;
     }
 
     get fontFamily(): string {
-        return this.mainEl.font('family');
+        return attr(this.localEl, 'font-family');
     }
 
     get fontSize(): number | string {
-        return this.mainEl.font('size');
+        return attr(this.localEl, 'font-size');
     }
 
     get fontWeight(): string | number {
-        return this.mainEl.font('weight');
+        return attr(this.localEl, 'font-weight');
     }
 
     get justification(): string {
-        return this.mainEl.font('anchor');
+        return attr(this.localEl, 'font-size-adjust');
     }
 
     get leading(): number | string {
-        return this.mainEl.font('leading');
-    }
-
-    get point(): XPoint {
-        const p = this.mainEl.point();
-        return new SPoint(p.x, p.y);
+        return attr(this.localEl, 'leading');
     }
 
     set content(value: string) {
-        this.mainEl.text(value)
+        innerSVG(this.localEl, value);
+        this.calculateSize();
     }
 
     set fontFamily(value: string) {
-        this.mainEl.font('family', value)
+        attr(this.localEl, 'font-family', value);
+        this.calculateSize();
     }
 
     set fontSize(value: number | string) {
-        this.mainEl.font('size', value);
+        attr(this.localEl, 'font-size', value);
+        this.calculateSize();
     }
 
     set fontWeight(value: string | number) {
-        this.mainEl.font('weight', value);
+        attr(this.localEl, 'font-weight', value);
+        this.calculateSize();
     }
 
     set justification(value: string) {
-        this.mainEl.font('anchor', value);
+        attr(this.localEl, 'anchor', value);
+        this.calculateSize();
     }
 
     set leading(value: number | string) {
-        this.mainEl.font('leading', value);
-    }
-
-    set point(value: XPoint) {
-        // this.mainEl.point(value.x, value.y);
-        this.position = value;
+        attr(this.localEl, 'leading', value);
+        this.calculateSize();
     }
 }
 
-class SRaster extends SItem implements XRaster {
-    constructor(draw: Svg, size: XSize, position?: XPoint) {
-        super(draw.rect(size.width, size.height));
-        if (position) {
-            this.position = position;
-        }
+class SRaster extends SItem<SVGGElement> implements XRaster {
+    constructor() {
+        super(create('g'));
     }
 
     setPixel(x: number, y: number, color: string): void {
@@ -783,13 +900,17 @@ class SRaster extends SItem implements XRaster {
 
 }
 
-class SShape extends SItem<Path> implements XShape {
+class SShape extends SNode<SVGPathElement> implements XShape {
 
     private pathCommand: PathCommand[];
 
-    constructor(draw: Svg) {
-        super(draw.path([]));
+    constructor() {
+        super(create('path'));
         this.pathCommand = [];
+    }
+
+    shape(): any {
+        return Shapes.path(this.buildPath());
     }
 
     addCommand(c: PathCommand): void {
@@ -797,7 +918,7 @@ class SShape extends SItem<Path> implements XShape {
     }
 
     addExtension(item: this): void {
-        this.mainEl.add(item.rootEl);
+        appendTo(item.mainEl, this.localEl);
     }
 
     begin(): void {
@@ -812,28 +933,24 @@ class SShape extends SItem<Path> implements XShape {
     }
 
     end(): void {
-        const str = this.pathCommand.map(x => x.join(' ')).join(' ');
-        this.mainEl.plot(str);
+        const str = this.buildPath();
+        attr(this.localEl, 'd', str)
     }
 
-    getIntersections(item: this): XPoint[] {
-        return [];
+    private buildPath(): string {
+        return this.pathCommand.map(x => x.join(' ')).join(' ');
     }
 }
 
-class SCompound extends SItem implements XNode {
-    private compound: XCompoundDef;
+class SCompound extends SItem<SVGGElement> implements XNode {
+    private compound: XInteractiveDef;
 
-    constructor(draw: Svg, compound: XCompoundDef) {
-        super(draw.group());
+    constructor(compound: XInteractiveDef) {
+        super(create('g'));
         this.compound = compound;
 
         const me: XItem = this;
-        me.addChildren(compound.items);
-    }
-
-    addExtension(item: this): void {
-        this.rootEl.add(item.rootEl)
+        compound.items && me.addChildren(compound.items);
     }
 
     command(name: string, ...data: any): void {
@@ -847,25 +964,36 @@ class SCompound extends SItem implements XNode {
 }
 
 class SBuilder implements XBuilder {
-    private draw: Svg;
+    private draw: SVGSVGElement;
+    private item: SItem<SVGSVGElement>;
 
     constructor(el: HTMLElement) {
-        this.draw = SVG().addTo(el);
-        this.draw.width('100%');
-        this.draw.height('100%');
+        this.draw = create('svg');
+        attr(this.draw, {width: '100%', height: '100%'});
+        this.item = new SItem(this.draw);
+        el.append(this.draw);
+    }
+
+    addItems(...children: XItem[]): void {
+        const i: XItem = this.item;
+        i.addChildren(children)
+    }
+
+    makeInteractive(def: XInteractiveDef): XNode {
+        return new SCompound(def);
     }
 
     destroy(): void {
         this.draw.remove();
     }
 
-    fromSVG(svg: SVGElement | string, options?: any): XItem {
+    fromSVG(svg: SVGGraphicsElement | string, options?: any): XItem {
         if (typeof svg === 'string') {
-            const item = this.draw.svg(svg, true)
+            const g = create('g')
+            const item = innerSVG(g, svg) as SVGGraphicsElement;
             return new SItem(item);
         }
-        const n = new Element(svg)
-        return new SItem(n);
+        return new SItem(svg);
     }
 
     makeBound(from: XPoint, to: XPoint): XBound;
@@ -883,76 +1011,61 @@ class SBuilder implements XBuilder {
         return undefined;
     }
 
-    makeCircle(point: XPoint, radius: number): XNode {
-        return new SCircle(this.draw, point.x, point.y, radius);
-    }
-
-    makeCompound(compound?: XCompoundDef): XNode {
-        return new SCompound(this.draw, compound);
+    makeCircle(): XCircle {
+        return new SCircle();
     }
 
     makeGroup(): XItem;
     makeGroup(children: XItem[]): XItem;
     makeGroup(children?: XItem[]): XItem {
         const c: XItem[] = children || []
-        const sGroup: XItem = new SGroup(this.draw);
+        const sGroup: XItem = new SGroup();
         sGroup.addChildren(c);
         return sGroup;
     }
 
-    makeLine(from: XPoint, to: XPoint): XNode {
-        return new SLine(this.draw, from, to);
+    makeLine(): XLine {
+        return new SLine();
     }
 
     makePath(): XShape {
-        return new SShape(this.draw);
+        return new SShape();
     }
 
     makePoint(x: number, y: number): XPoint {
         return new SPoint(x, y);
     }
 
-    makeRaster(size: XSize, position?: XPoint): XRaster {
-        return new SRaster(this.draw, size, position);
+    makeRaster(): XRaster {
+        return new SRaster();
     }
 
-    makeRect(point: XPoint, size: XSize): XNode;
-    makeRect(bound: XBound, radius?: number): XNode;
-    makeRect(x: XPoint | XBound, y?: XSize | number): XNode {
-        if ('width' in x) {
-            if (y && typeof y === 'number') {
-                return new SRect(this.draw, x.x, x.y, x.width, x.height, y);
-            } else {
-                return new SRect(this.draw, x.x, x.y, x.width, x.height, 0);
-            }
-        } else if (typeof y !== 'number') {
-            return new SRect(this.draw, x.x, x.y, y.width, y.height, 0);
-        }
-        return undefined;
+    makeRect(): XRect {
+        return new SRect();
     }
 
     makeSize(width: number, height: number): XSize {
         return new SSize(width, height);
     }
 
-    makeText(point: XPoint, content?: string): XText {
-        const sText = new SText(this.draw, content);
-        sText.point = point;
+    makeText(): XText {
+        const sText = new SText();
 
         return sText;
     }
 
     viewCenter(): XPoint {
-        const box = this.draw.viewbox();
-        return new SPoint(box.cx, box.cy);
+        const box = this.draw.getBoundingClientRect();
+        const bound = new SBound(box.x, box.y, box.width, box.height);
+        return bound.center;
     }
 
     viewSize(): XSize {
-        const box = this.draw.viewbox();
+        const box = this.draw.getBoundingClientRect()
         return new SSize(box.width, box.height);
     }
 }
 
-export default function SVGRenderer(el: HTMLElement) {
+export default function SVGRenderer(el: HTMLElement): XBuilder {
     return new SBuilder(el);
 }

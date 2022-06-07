@@ -70,9 +70,7 @@ const XInteractivePlugin: XPluginDef = definePlugin({
             function doListeners() {
                 listeners.push(
                     node.on('mousedrag', (event: XEvent): void => {
-
                         base.command(Command.elementDrag, event.point)
-                        // actionDispatcher(`${node.id}-drag`, node);
                     })
                 );
             }

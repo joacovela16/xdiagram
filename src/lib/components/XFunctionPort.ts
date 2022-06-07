@@ -1,7 +1,7 @@
 import {Callable, XContext, XElementDef, XElementFactory, XID, XTheme} from "../shared/XTypes";
 import {defineElement} from "../shared/XHelper";
 import {XNode, XPoint} from "../shared/XRender";
-import {doArray, doLinker, doLinkZone, doPointer, doReceptor, doSnap, getOrElse, isDefined, isUndefined} from "../shared/XLib";
+import {doArray, doLinker, doLinkZone, doPointer, doReceptor, getOrElse, isDefined, isUndefined} from "../shared/XLib";
 import {Command, HookActionEnum, HookFilterEnum} from "../shared/Instructions";
 import {LinkedList} from "../shared/XList";
 
@@ -68,6 +68,7 @@ export default function XFunctionPort(cfg: XNodeBase): XElementFactory<XFunction
             listener.filter(HookFilterEnum.ELEMENTS_CAN_LINK, (v: boolean, src: XNode, trg: XNode) => {
                 const srcData = src.data;
                 const trgData = trg.data;
+                console.log(v);
 
                 if (srcData && srcData.type === NODE_TYPE && isDefined(srcData.parent) && links.has(`${srcData.parent}-${src.id}`)) {
                     return false;
@@ -94,12 +95,11 @@ export default function XFunctionPort(cfg: XNodeBase): XElementFactory<XFunction
                 return value;
             });
 
-
             listener.filter("x-delete-plugin-can-apply", defaultFilter);
             listener.filter("x-copy-plugin-can-apply", defaultFilter);
 
-
             listener.action(HookActionEnum.ELEMENT_UNLINKED, (id: XID) => {
+
                 context
                     .getElement(id)
                     .filter(x => isDefined(x.data) && isDefined(x.data.parent) && x.data.type === NODE_TYPE)
@@ -123,7 +123,6 @@ export default function XFunctionPort(cfg: XNodeBase): XElementFactory<XFunction
                             });
                     });
             });
-
 
             listener.action(HookActionEnum.ELEMENTS_LINKED, (src: XID, trg: XID) => {
                 [src, trg].forEach(id => {
@@ -157,7 +156,6 @@ export default function XFunctionPort(cfg: XNodeBase): XElementFactory<XFunction
             textEl.fontSize = getOrElse(finalCfg.fontSize, 28);
             textEl.fillColor = getOrElse(finalCfg.textColor, theme.baseContent);
 
-
             // render ports
             const portsElements: XNode[] = [];
             const innerDef = finalCfg.in || [];
@@ -170,11 +168,10 @@ export default function XFunctionPort(cfg: XNodeBase): XElementFactory<XFunction
             finalCfg.inner = inner;
             finalCfg.outer = outer;
 
-
             const maxPorts = Math.max(inNumber * portTextSize, outNumber * portTextSize) * 3;
             const textPaperBounds = textEl.bounds.clone();
             const tmpWidth = textPaperBounds.width + padding;
-            const tmpHeight = textPaperBounds.height +padding;
+            const tmpHeight = textPaperBounds.height + padding;
 
             textPaperBounds.width = tmpWidth;
             textPaperBounds.height = tmpHeight;//Math.max(tmpHeight, maxPorts);
@@ -187,7 +184,6 @@ export default function XFunctionPort(cfg: XNodeBase): XElementFactory<XFunction
             rectEl.strokeWidth = getOrElse(finalCfg.strokeWidth, 0);
             rectEl.fillColor = getOrElse(finalCfg.fillColor, theme.primaryContent);
 
-
             const DEFAULT_OFFSET: number = 10;
             const distance = maxPorts;//bounds.bottomLeft.getDistance(bounds.topLeft);
 
@@ -198,7 +194,7 @@ export default function XFunctionPort(cfg: XNodeBase): XElementFactory<XFunction
                     labels: innerDef,
                     src: bounds.topLeft.y,
                     trg: bounds.bottomLeft.y,
-                    pointRef: bounds.leftCenter.subtract(b.makePoint(0,maxPorts/2)),
+                    pointRef: bounds.leftCenter.subtract(b.makePoint(0, maxPorts / 2)),
                     fill: getOrElse(finalCfg.inColor, theme.primary),
                     xOffset: -DEFAULT_OFFSET,
                     yOffset: distance / (inNumber + 1),
@@ -215,7 +211,7 @@ export default function XFunctionPort(cfg: XNodeBase): XElementFactory<XFunction
                     labels: outerDef,
                     src: bounds.topRight.y,
                     trg: bounds.bottomRight.y,
-                    pointRef: bounds.rightCenter.subtract(b.makePoint(0,maxPorts/2)),
+                    pointRef: bounds.rightCenter.subtract(b.makePoint(0, maxPorts / 2)),
                     fill: getOrElse(finalCfg.outColor, theme.secondary),
                     xOffset: DEFAULT_OFFSET,
                     yOffset: distance / (outNumber + 1),
@@ -242,7 +238,6 @@ export default function XFunctionPort(cfg: XNodeBase): XElementFactory<XFunction
                     finalPt.y += datum.yOffset;
                     const p = b.makePoint(x, finalPt.y);
 
-
                     const text = b.makeText(finalPt, labels[j]);
                     text.fillColor = theme.base100;
                     text.fontSize = portTextSize;
@@ -259,9 +254,11 @@ export default function XFunctionPort(cfg: XNodeBase): XElementFactory<XFunction
                             },
                             [Command.onElementLinkOut]() {
                                 rect.fillColor = datum.fill;
+
                             },
                             [Command.onElementNormal]() {
                                 rect.fillColor = datum.fill;
+                                console.log('onElementNormal')
                             },
                             [Command.onElementError]() {
                                 rect.fillColor = theme.error;
@@ -296,6 +293,8 @@ export default function XFunctionPort(cfg: XNodeBase): XElementFactory<XFunction
                         linkable: true
                     };
 
+                    doLinkZone(compound, hookManager, compound);
+                    //doPointer(compound, context);
                     isOuter && taskOnRemove.push(doLinker(compound, compound, compound, context, hookManager));
                     taskOnRemove.push(() => {
                         context.removeElement(localID);
@@ -303,8 +302,6 @@ export default function XFunctionPort(cfg: XNodeBase): XElementFactory<XFunction
                     });
                     isOuter && doPointer(rect, context);
 
-                    doLinkZone(compound, hookManager);
-                    doPointer(compound, context);
                     context.addElement(compound);
                 }
             }
@@ -318,7 +315,7 @@ export default function XFunctionPort(cfg: XNodeBase): XElementFactory<XFunction
                         }
                     },
                     [Command.elementDrag](point: XPoint) {
-                        rootEl.moveTo(doSnap(point));
+                        rootEl.moveTo(point);
                         actionDispatcher(`${rootEl.id}-drag`, rootEl);
                         portsElements.forEach(x => actionDispatcher(`${x.id}-drag`, x));
                     },
@@ -326,10 +323,10 @@ export default function XFunctionPort(cfg: XNodeBase): XElementFactory<XFunction
                         rectEl.strokeColor = theme.accent;
                     },
                     [Command.onElementLinkOut]() {
-                        rectEl.strokeColor = getOrElse(config.strokeColor, theme.primary);
+                        rectEl.strokeColor = getOrElse(finalCfg.strokeColor, theme.primary);
                     },
                     [Command.onElementNormal]() {
-                        rectEl.strokeColor = getOrElse(config.strokeColor, theme.primary);
+                        rectEl.strokeColor = getOrElse(finalCfg.strokeColor, theme.primary);
                     },
                     [Command.onElementLinked]() {
                         rectEl.strokeColor = getOrElse(finalCfg.strokeColor, theme.primary);
@@ -340,7 +337,6 @@ export default function XFunctionPort(cfg: XNodeBase): XElementFactory<XFunction
 
                 }
             );
-
 
             const rootEl = b.makeInteractive({
                 items: [rectEl, textEl, ...portsElements],

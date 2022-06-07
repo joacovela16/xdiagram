@@ -25,7 +25,6 @@ export default class XDiagram {
 
         const builder = options.renderer(element);
 
-
         const hookManager: HookManagerProxy = doHookProxy(doHookBuilder());
         const dispatcher: HookDispatcher = hookManager.dispatcher;
         const listener: HookListener = hookManager.listener;
@@ -36,11 +35,12 @@ export default class XDiagram {
         const backLayer = builder.makeGroup();
         const middleLayer = builder.makeGroup();
         const frontLayer = builder.makeGroup();
-
-        layerStore['container'] = builder.makeGroup([backLayer, middleLayer, frontLayer]);
+        const container = builder.makeGroup([backLayer, middleLayer, frontLayer]);
+        layerStore['container'] = container;
         layerStore['back'] = backLayer;
         layerStore['middle'] = middleLayer;
         layerStore['front'] = frontLayer;
+        builder.addItems(container);
 
         const context: XContext = {
             element,
@@ -48,7 +48,13 @@ export default class XDiagram {
             builder,
             theme,
             getLayer(name: string): XItem {
-                return layerStore[name] || (layerStore[name] = builder.makeGroup());
+                if (layerStore[name]) {
+                    return layerStore[name];
+                }
+                const g = builder.makeGroup();
+                layerStore[name] = g;
+                container.addChild(layerStore[name]);
+                return g;
             },
             removeLayer(name: string) {
                 const layer = layerStore[name];

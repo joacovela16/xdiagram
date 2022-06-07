@@ -1,7 +1,7 @@
 import {Callable, XContext, XElementDef, XElementFactory, XID, XTheme} from "../shared/XTypes";
 import {defineElement} from "../shared/XHelper";
 import {XNode, XPoint} from "../shared/XRender";
-import {doArray, doLinker, doLinkZone, doPointer, doReceptor, doSnap, getOrElse, isDefined, isUndefined} from "../shared/XLib";
+import {doArray, doLinker, doLinkZone, doPointer, doReceptor, getOrElse, isDefined, isUndefined} from "../shared/XLib";
 import {Command, HookActionEnum, HookFilterEnum} from "../shared/Instructions";
 import {LinkedList} from "../shared/XList";
 
@@ -63,6 +63,7 @@ export default function XNodePort(cfg: XNodeBase): XElementFactory<XNodePortDef>
             const links: Set<string> = new Set<string>();
 
             listener.filter(HookFilterEnum.ELEMENTS_CAN_LINK, (v: boolean, src: XNode, trg: XNode) => {
+
                 const srcData = src.data;
                 const trgData = trg.data;
 
@@ -77,6 +78,7 @@ export default function XNodePort(cfg: XNodeBase): XElementFactory<XNodePortDef>
                 if (srcData && srcData.type === NODE_PORT && trgData && trgData.type === NODE_PORT && srcData && trgData && srcData.isOut && trgData.isOut) {
                     return false;
                 }
+
                 return v;
             });
 
@@ -107,11 +109,12 @@ export default function XNodePort(cfg: XNodeBase): XElementFactory<XNodePortDef>
                                 const outerIdx = outer.indexOf(id);
                                 outerIdx !== -1 && (outer[outerIdx] = undefined);
 
+                                console.log(`${parent}-${id}`)
+                                console.log(links)
                                 links.delete(`${parent}-${id}`);
                             });
                     });
             });
-
 
             listener.action(HookActionEnum.ELEMENTS_LINKED, (src: XID, trg: XID) => {
                 [src, trg].forEach(id => {
@@ -144,7 +147,6 @@ export default function XNodePort(cfg: XNodeBase): XElementFactory<XNodePortDef>
             textEl.fontSize = getOrElse(finalCfg.fontSize, 28);
             textEl.fillColor = getOrElse(finalCfg.textColor, theme.baseContent);
 
-
             // render ports
             const portsElements: XNode[] = [];
             const inNumber = finalCfg.in;
@@ -155,7 +157,6 @@ export default function XNodePort(cfg: XNodeBase): XElementFactory<XNodePortDef>
             const portsConf: PortConf[] = []
             finalCfg.inner = inner;
             finalCfg.outer = outer;
-
 
             const maxPorts = Math.max(inNumber * getOrElse(finalCfg.inRadius, DEFAULT_RADIUS_SIZE), outNumber * getOrElse(finalCfg.outRadius, DEFAULT_RADIUS_SIZE)) * 3;
             const textPaperBounds = textEl.bounds.clone();
@@ -258,8 +259,6 @@ export default function XNodePort(cfg: XNodeBase): XElementFactory<XNodePortDef>
 
                     const circle = b.makeCircle(finalPt, radius);
                     circle.fillColor = datum.fill;
-                    // circle.strokeWidth = datum.strokeWidth;
-                    // circle.strokeColor = datum.strokeColor;
 
                     const localID: XID = `${kind}:${j}:${PARENT_ID}`;
                     const compound: XNode = b.makeInteractive({
@@ -320,7 +319,7 @@ export default function XNodePort(cfg: XNodeBase): XElementFactory<XNodePortDef>
                         }
                     },
                     [Command.elementDrag](point: XPoint) {
-                        rootEl.moveTo(doSnap(point));
+                        rootEl.moveTo(point);
                         actionDispatcher(`${rootEl.id}-drag`, rootEl);
                         portsElements.forEach(x => actionDispatcher(`${x.id}-drag`, x));
                     }

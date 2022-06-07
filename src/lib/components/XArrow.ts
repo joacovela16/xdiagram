@@ -1,11 +1,10 @@
-import {cutSegment, doHover, doReceptor, doSnap, getOrElse, isDefined, isUndefined, Timer} from "../shared/XLib";
+import {cutSegment, doHover, doReceptor, getOrElse, isDefined, isUndefined, pointQuadrant, Timer} from "../shared/XLib";
 import type {XContext, XElementDef, XElementFactory, XID, XTheme} from "../shared/XTypes";
 import {Callable} from "../shared/XTypes";
 import {defineElement} from "../shared/XHelper";
-import type {XBuilder, XItem, XNode, XPoint, XShape} from "../shared/XRender";
+import type {XBound, XBuilder, XItem, XNode, XPoint, XShape} from "../shared/XRender";
 import {PathHelper} from "../shared/XRender";
 import {Command, HookActionEnum, HookFilterEnum} from "../shared/Instructions";
-import doReactive from "../shared/Reactive";
 import {LinkedList, Record} from "../shared/XList";
 
 interface XDraw {
@@ -26,52 +25,18 @@ interface ArrowExtreme extends XDraw {
     element: XNode;
 }
 
-type Coord = { x: number; y: number };
+type Position = { x: number; y: number };
 
 export type XArrowDef = {
     src: XID;
     trg: XID;
-    stages?: Coord[];
+    stages?: Position[];
+    joinMode?: "continuous" | "step",
+    arrowMode?: "line" | "simple" | "waypoints"
 } & XElementDef;
 
 function isZero(n: number, epsilon: number = 0.05) {
     return n > -epsilon && n < epsilon;
-}
-
-abstract class ArrowHandler {
-    protected path: XShape;
-    protected config: XArrowDef;
-    protected context: XContext;
-    protected redraw: () => void;
-
-    constructor(path: XShape, config: XArrowDef, context: XContext) {
-        this.path = path;
-        this.config = config;
-        this.context = context;
-    }
-
-    abstract init(): void
-
-    abstract getSrcNode(): XNode
-
-    abstract getTrgNode(): XNode
-
-    setRedraw(handler: () => void): void {
-        this.redraw = handler;
-    }
-}
-
-class SteppedArrow extends ArrowHandler {
-    init(): void {
-    }
-
-    getSrcNode(): XNode {
-        return undefined;
-    }
-
-    getTrgNode(): XNode {
-        return undefined;
-    }
 }
 
 const XArrow: XElementFactory = defineElement<XArrowDef>({
@@ -89,15 +54,11 @@ const XArrow: XElementFactory = defineElement<XArrowDef>({
         const SECONDARY_LENGTH: number = 25;
         const ANGLE: number = 20;
 
-        let start_arrow_diff = PRIMARY_LENGTH;
-        let end_arrow_diff = PRIMARY_LENGTH;
-
-
         const pathTool = b.makePath();
         pathTool.visible = false;
         config.stages || (config.stages = []);
 
-        const initialStages: Coord[] = config.stages;
+        const initialStages: Position[] = config.stages;
 
         let stagesCount: number = initialStages.length;
         let isDraggingMode: boolean = false;
@@ -109,17 +70,17 @@ const XArrow: XElementFactory = defineElement<XArrowDef>({
         const actionDispatcher = hookManager.dispatcher.action;
         const filterDispatcher = hookManager.dispatcher.filter;
         const actionListener = hookManager.listener.action;
-        const confReactive = doReactive<XElementDef>(config);
 
         actionDispatcher('x-arrow-config-mapper', config);
+
+        const joinMode = config.joinMode || "continuous";
+        const arrowMode = config.arrowMode || "simple";
 
         const onRemoveCallable: LinkedList<Callable> = new LinkedList<Callable>();
         const dragTimer = new Timer(300);
         const stages: XStage[] = []
         const tools: XDraw[] = []
         const path = b.makePath();
-
-        const renderer: ArrowHandler = new SteppedArrow(path, config, context);
 
         const command = doReceptor(
             {
@@ -128,9 +89,6 @@ const XArrow: XElementFactory = defineElement<XArrowDef>({
                 },
                 [Command.remove]() {
                     removeThis();
-                },
-                [Command.config](cfg: XElementDef) {
-                    confReactive.set(cfg);
                 }
             }
         );
@@ -168,18 +126,9 @@ const XArrow: XElementFactory = defineElement<XArrowDef>({
 
         stagesCount = stages.length;
         path.strokeColor = theme.accent;
-        path.strokeWidth = 3;
+        path.strokeWidth = 2;
         rootEl.id = config.id;
         config.linkable = false;
-
-        buildArrowTool(stages[0]);
-        buildArrowTool(stages[1]);
-
-        confReactive.subscribe(cfg => {
-            start_arrow_diff = cfg.sourcePointer ? PRIMARY_LENGTH : 0;
-            end_arrow_diff = cfg.targetPointer ? PRIMARY_LENGTH : 0;
-            cfg.dashArray && (path.dashArray = cfg.dashArray);
-        });
 
         path.on("mouseenter", () => {
             style.cursor = isSelectionMode ? 'cell' : 'pointer';
@@ -213,7 +162,7 @@ const XArrow: XElementFactory = defineElement<XArrowDef>({
                 stages.forEach((v: XStage, index: number) => v.index = index);
                 stagesCount++;
                 buildVertex(stage);
-                updatePositions();
+                renderer();
             } else {
                 isSelectionMode = true;
                 setToolsVisible(true);
@@ -221,34 +170,48 @@ const XArrow: XElementFactory = defineElement<XArrowDef>({
             }
         });
 
-        confReactive.subscribe(val => {
-            const dashArray = val.dashArray;
-            dashArray && (path.dashArray = dashArray);
-        });
-
         context.getLayer('front').addChild(rootEl);
         rootEl.data = config;
 
         srcRefNode && trgRefNode && actionDispatcher(HookActionEnum.ELEMENTS_LINKED, srcRefNode.id, trgRefNode.id);
-        updatePositions();
+        let extremeUpdater: () => void;
+        let pathRenderer: () => void;
+        let triangleRenderer: (startPoint: XPoint, endPoint: XPoint, length: number, angle: number, path: XShape) => void = defaultTriangleRenderer;
 
-        function removeThis() {
+        installer();
+        renderer();
 
-            actionDispatcher(HookActionEnum.ELEMENT_DELETED, rootEl);
-            const src: XID = config.src;
-            const trg: XID = config.trg;
-            const srcDef = isDefined(src);
-            const trgDef = isDefined(trg);
+        buildArrowTool(stages[0]);
+        buildArrowTool(stages[stagesCount - 1]);
 
-            srcDef && actionDispatcher(HookActionEnum.ELEMENT_UNLINKED, src);
-            trgDef && actionDispatcher(HookActionEnum.ELEMENT_UNLINKED, trg);
-            srcDef && trgDef && actionDispatcher(HookActionEnum.ELEMENTS_UNLINKED, src, trg);
+        function installer() {
+            switch (joinMode) {
+                case "step":
+                    break;
+                default:
+                    extremeUpdater = continuousExtremeUpdater;
+                    break;
+            }
 
-            context.removeElement(ID);
-            rootEl.remove();
-            confReactive.clean();
-            onRemoveCallable.forEach(x => x());
-            onRemoveCallable.clean();
+            switch (arrowMode) {
+                case "line":
+                    break;
+                case "simple":
+                    const last = stages[stagesCount - 1];
+                    stages[1] = {index: 1, point: undefined};
+                    stages[2] = {index: 2, point: undefined};
+                    stages[3] = last;
+                    stages.forEach((item, idx) => item.index = idx);
+                    stagesCount = 4;
+
+                    stepExtremeUpdater();
+                    pathRenderer = simplePathRenderer;
+                    extremeUpdater = stepExtremeUpdater;
+                    break;
+                default:
+                    pathRenderer = waypointsPathRenderer;
+                    break;
+            }
         }
 
         function hideAll() {
@@ -256,9 +219,9 @@ const XArrow: XElementFactory = defineElement<XArrowDef>({
             setToolsVisible();
         }
 
-        function updatePositions(): void {
-            updateExtremes();
-            drawPath();
+        function renderer(): void {
+            extremeUpdater();
+            pathRenderer();
             drawTools();
         }
 
@@ -293,8 +256,8 @@ const XArrow: XElementFactory = defineElement<XArrowDef>({
             circle.strokeColor = theme.neutralContent;
 
             circle.on('mousedrag', (event) => {
-                stage.point = doSnap(event.point);
-                updatePositions();
+                stage.point = event.point;
+                renderer();
             });
             circle.on('mousedown', () => {
                 timer.handle(() => {
@@ -334,9 +297,8 @@ const XArrow: XElementFactory = defineElement<XArrowDef>({
                     isVertexUnLock = false;
                     stagesCount--;
 
-                    updatePositions();
+                    renderer();
                     updateData();
-                    // actionDispatcher(HookActionEnum.EDGE_SELECTED, rootEl);
                     actionDispatcher(HookActionEnum.ELEMENT_SELECTED, rootEl);
                 }
             );
@@ -347,78 +309,16 @@ const XArrow: XElementFactory = defineElement<XArrowDef>({
             tools.forEach(x => x.setVisible(value));
         }
 
-        function isOverTool(point: XPoint) {
+        function isOverTool(point: XPoint): boolean {
             return tools.some(x => x.contains(point));
         }
 
-        function drawPath() {
-            const maxLength: number = stages.length - 1;
-
-            path.begin();
-            path.addCommand(PathHelper.moveTo(cutSegment(stages[1].point, stages[0].point, start_arrow_diff)));
-
-            for (let i = 1; i < maxLength; i++) {
-                const curPoint = stages[i].point;
-                const nextPoint = stages[i + 1].point;
-                const prevPoint = stages[i - 1].point;
-
-                path.addCommand(PathHelper.lineTo(cutSegment(prevPoint, curPoint, 10)));
-                path.addCommand(PathHelper.quadraticTo(curPoint, cutSegment(nextPoint, curPoint, 10)))
-            }
-
-            path.addCommand(PathHelper.lineTo(cutSegment(stages[maxLength - 1].point, stages[maxLength].point, end_arrow_diff)))
-            path.end();
-        }
-
-        /*
-                function buildCircleShape(): ArrowExtreme {
-                    const el = b.makeCircle(b.makePoint(0, 0), 5);
-
-                    let startPoint: XPoint, endPoint: XPoint;
-                    const _draw = () => {
-                    };
-
-                    return {
-                        element: el,
-                        contains(p: XPoint): boolean {
-                            return el.contains(p);
-                        },
-                        draw(): void {
-                            _draw();
-                        },
-                        remove(): void {
-                            el.remove();
-                        },
-                        setPosition(start: XPoint, end: XPoint): void {
-                            startPoint = start;
-                            endPoint = end;
-                            _draw();
-                        },
-                        setVisible(v: boolean): void {
-                            el.visible = v;
-                        }
-
-                    }
-                }
-        */
-
         function buildTriangleShape(length: number, angle: number): ArrowExtreme {
             const trianglePath = b.makePath();
-
             let startPoint: XPoint, endPoint: XPoint;
 
-            const _draw = (): void => {
+            const _draw: () => void = () => triangleRenderer(startPoint, endPoint, length, angle, trianglePath);
 
-                const v = startPoint.subtract(endPoint).normalize(length);
-                const ref = endPoint.add(v);
-
-                trianglePath.begin();
-                trianglePath.addCommand(PathHelper.moveTo(endPoint));
-                trianglePath.addCommand(PathHelper.lineTo(ref.rotate(angle, endPoint)));
-                trianglePath.addCommand(PathHelper.lineTo(ref.rotate(-angle, endPoint)));
-                trianglePath.addCommand(PathHelper.close());
-                trianglePath.end();
-            }
             return {
                 element: trianglePath,
                 contains(p: XPoint): boolean {
@@ -445,24 +345,19 @@ const XArrow: XElementFactory = defineElement<XArrowDef>({
             const primaryArrow: ArrowExtreme = buildTriangleShape(PRIMARY_LENGTH, ANGLE);
             const primaryEl = primaryArrow.element;
 
-            primaryArrow.setVisible(false);
+            const fillColor = isSource ? (config.sourcePointer || false) : (config.targetPointer || false);
+
+            if (fillColor) {
+                if (typeof fillColor === 'boolean') {
+                    primaryEl.fillColor = theme.accent;
+                    primaryArrow.setVisible(fillColor);
+                } else {
+                    primaryEl.fillColor = getOrElse(fillColor.fill, theme.accent);
+                }
+            }
+
             primaryEl.on('mouseenter', () => setToolsVisible(true));
             parent.addChild(primaryEl);
-
-            confReactive.subscribe(cfg => {
-                const value = isSource ? cfg.sourcePointer : cfg.targetPointer;
-                if (value) {
-                    if (typeof value === 'boolean') {
-                        primaryEl.fillColor = theme.accent;
-                        primaryArrow.setVisible(value);
-                    } else {
-                        primaryEl.fillColor = getOrElse(value.fill, theme.accent);
-                        if (value.shape === 'circle') {
-
-                        }
-                    }
-                }
-            });
 
             return primaryArrow;
         }
@@ -473,7 +368,6 @@ const XArrow: XElementFactory = defineElement<XArrowDef>({
 
             const isSource: boolean = stage.index === 0;
             const primaryArrow: XDraw = buildPrimaryArrow(rootEl, isSource);
-            buildPrimaryArrow(rootEl, isSource);
 
             const secondaryArrow: ArrowExtreme = buildTriangleShape(SECONDARY_LENGTH, ANGLE)
             const secondaryEl = secondaryArrow.element;
@@ -493,9 +387,7 @@ const XArrow: XElementFactory = defineElement<XArrowDef>({
             const _draw = (): void => {
                 const start = getStartPoint()
                 const end = getEndpoint();
-
                 primaryArrow.setPosition(start, end);
-
                 secondaryArrow.setPosition(start, end.add(end.subtract(start).normalize(8)));
             };
 
@@ -505,8 +397,7 @@ const XArrow: XElementFactory = defineElement<XArrowDef>({
                 if (isDraggingMode) {
 
                     stage.point = stage.point.add(event.delta);
-                    updatePositions();
-
+                    renderer();
                     if (nodeSelection && !nodeSelection.contains(event.point)) {
                         nodeSelection.command(Command.onElementLinkOut);
                         nodeSelection = null;
@@ -539,14 +430,12 @@ const XArrow: XElementFactory = defineElement<XArrowDef>({
                     })
                 }
             });
-
             secondaryEl.on('mousedown', () => {
                 setter(null);
                 nodeSetter = setter;
                 isDraggingMode = true;
                 actionDispatcher(HookActionEnum.ELEMENT_START_DRAG, rootEl);
             });
-
             secondaryEl.on('mouseup', () => {
                 isDraggingMode = false;
                 htmlElement.style.cursor = 'default';
@@ -554,7 +443,7 @@ const XArrow: XElementFactory = defineElement<XArrowDef>({
                 if (nodeSelection) {
                     nodeSelection.command(Command.onElementNormal);
                     nodeSetter(nodeSelection);
-                    updatePositions();
+                    renderer();
                     updateData();
                     nodeSelection = null;
                 }
@@ -589,7 +478,7 @@ const XArrow: XElementFactory = defineElement<XArrowDef>({
 
             function buildSetter() {
                 const dragImpl: Callable = () => {
-                    updatePositions();
+                    renderer();
                     dragTimer.clear();
                     dragTimer.handle(() => updateData());
                 };
@@ -643,7 +532,142 @@ const XArrow: XElementFactory = defineElement<XArrowDef>({
             }
         }
 
-        function updateExtremes(): void {
+        //************** PATH RENDERER **************//
+
+        function simplePathRenderer(): void {
+
+            path.begin();
+            path.addCommand(PathHelper.moveTo(stages[0].point))
+            for (let i = 1; i < 4; i++) {
+                path.addCommand(PathHelper.lineTo(stages[i].point))
+            }
+
+            path.end();
+        }
+
+        function waypointsPathRenderer(): void {
+            const maxLength: number = stages.length - 1;
+
+            path.begin();
+            path.addCommand(PathHelper.moveTo(stages[0].point));
+
+            for (let i = 1; i < maxLength; i++) {
+                const curPoint = stages[i].point;
+                const nextPoint = stages[i + 1].point;
+                const prevPoint = stages[i - 1].point;
+
+                path.addCommand(PathHelper.lineTo(cutSegment(prevPoint, curPoint, 10)));
+                path.addCommand(PathHelper.quadraticTo(curPoint, cutSegment(nextPoint, curPoint, 10)))
+            }
+
+            path.addCommand(PathHelper.lineTo(stages[maxLength].point))
+            path.end();
+        }
+
+        //************** EXTREME UPDATER **************//
+
+        function stepExtremeUpdater() {
+            const srcBox: XBound = srcRefNode && srcRefNode.bounds;
+            const trgBox: XBound = trgRefNode && trgRefNode.bounds;
+            const srcCenter: XPoint = stages[0].point// srcBox.center;
+            const trgCenter: XPoint = stages[stagesCount - 1].point;// trgBox.center;
+
+            const w: number = Math.abs(srcCenter.x - trgCenter.x);
+            const maxWidth: number = Math.max((srcBox && srcBox.width) || 0, (trgBox && trgBox.width) || 0);
+            const isLessW: boolean = w < maxWidth;
+            const quadrant = pointQuadrant(trgCenter, srcCenter);
+
+            switch (quadrant) {
+                case "TR":
+
+                    if (isLessW) {
+                        const start = (srcBox && srcBox.topCenter) || stages[0].point;
+                        const end = (trgBox && trgBox.bottomCenter) || stages[3].point;
+                        const bound = b.makeBound(start, end);
+                        stages[0].point = start;
+                        stages[1].point = bound.leftCenter;
+                        stages[2].point = bound.rightCenter;
+                        stages[3].point = end;
+                    } else {
+                        const start = (srcBox && srcBox.rightCenter) || stages[0].point;
+                        const end = (trgBox && trgBox.leftCenter) || stages[3].point;
+                        const bound = b.makeBound(start, end);
+                        stages[0].point = start;
+                        stages[1].point = bound.bottomCenter;
+                        stages[2].point = bound.topCenter;
+                        stages[3].point = end;
+                    }
+
+                    break;
+                case "TL":
+                    if (isLessW) {
+
+                        const start = (srcBox && srcBox.topCenter) || stages[0].point;
+                        const end = (trgBox && trgBox.bottomCenter) || stages[3].point;
+                        const bound = b.makeBound(start, end);
+                        stages[0].point = start;
+                        stages[1].point = bound.rightCenter;
+                        stages[2].point = bound.leftCenter;
+                        stages[3].point = end;
+                    } else {
+
+                        const start = (srcBox && srcBox.leftCenter) || stages[0].point;
+                        const end = (trgBox && trgBox.rightCenter) || stages[3].point;
+                        const bound = b.makeBound(start, end);
+                        stages[0].point = start;
+                        stages[1].point = bound.bottomCenter;
+                        stages[2].point = bound.topCenter;
+                        stages[3].point = end;
+                    }
+                    break;
+                case "BL":
+                    if (isLessW) {
+
+                        const start = (srcBox && srcBox.bottomCenter) || stages[0].point;
+                        const end = (trgBox && trgBox.topCenter) || stages[3].point;
+                        const bound = b.makeBound(start, end);
+                        stages[0].point = start;
+                        stages[1].point = bound.rightCenter;
+                        stages[2].point = bound.leftCenter;
+                        stages[3].point = end;
+
+                    } else {
+
+                        const start = (srcBox && srcBox.leftCenter) || stages[0].point;
+                        const end = (trgBox && trgBox.rightCenter) || stages[3].point;
+                        const bound = b.makeBound(start, end);
+                        stages[0].point = start;
+                        stages[1].point = bound.topCenter;
+                        stages[2].point = bound.bottomCenter;
+                        stages[3].point = end;
+                    }
+                    break;
+                case "BR":
+                    if (isLessW) {
+
+                        const start = (srcBox && srcBox.bottomCenter) || stages[0].point;
+                        const end = (trgBox && trgBox.topCenter) || stages[3].point;
+                        const bound = b.makeBound(start, end);
+                        stages[0].point = start;
+                        stages[1].point = bound.leftCenter;
+                        stages[2].point = bound.rightCenter;
+                        stages[3].point = end;
+
+                    } else {
+
+                        const start = (srcBox && srcBox.rightCenter) || stages[0].point;
+                        const end = (trgBox && trgBox.leftCenter) || stages[3].point;
+                        const bound = b.makeBound(start, end);
+                        stages[0].point = start;
+                        stages[1].point = bound.topCenter;
+                        stages[2].point = bound.bottomCenter;
+                        stages[3].point = end;
+                    }
+                    break;
+            }
+        }
+
+        function continuousExtremeUpdater(): void {
             const srcCenter = srcRefNode && srcRefNode.bounds.center;
             const trgCenter = trgRefNode && trgRefNode.bounds.center;
 
@@ -671,7 +695,6 @@ const XArrow: XElementFactory = defineElement<XArrowDef>({
                     pathTool.addCommand(PathHelper.moveTo(trgCenter));
 
                     if (srcRefNode) {
-                        // pathTool.lineTo(srcCenter);
                         pathTool.addCommand(PathHelper.lineTo(srcCenter));
                         pathTool.end();
                         const srcPoints = srcRefNode.getIntersections(pathTool);
@@ -686,7 +709,6 @@ const XArrow: XElementFactory = defineElement<XArrowDef>({
                     const firstTrgPoint: XPoint = trgPoints && trgPoints[0];
                     firstTrgPoint && (stages[stagesCount - 1].point = firstTrgPoint);
                 }
-
 
             } else {
 
@@ -713,9 +735,53 @@ const XArrow: XElementFactory = defineElement<XArrowDef>({
             }
         }
 
+        //************** TRIANGLE RENDERER **************//
+        function defaultTriangleRenderer(startPoint: XPoint, endPoint: XPoint, length: number, angle: number, path: XShape): void {
+            const v = startPoint.subtract(endPoint).normalize(length);
+            const ref = endPoint.add(v);
+
+            path.begin();
+            path.addCommand(PathHelper.moveTo(endPoint));
+            path.addCommand(PathHelper.lineTo(ref.rotate(angle, endPoint)));
+            path.addCommand(PathHelper.lineTo(ref.rotate(-angle, endPoint)));
+            path.addCommand(PathHelper.close());
+            path.end();
+        }
+
+        function stepTriangleRenderer(startPoint: XPoint, endPoint: XPoint, length: number, angle: number, path: XShape): void {
+            const v = startPoint.subtract(endPoint).normalize(length);
+            const ref = endPoint.add(v);
+
+            path.begin();
+            path.addCommand(PathHelper.moveTo(endPoint));
+            path.addCommand(PathHelper.lineTo(ref.rotate(angle, endPoint)));
+            path.addCommand(PathHelper.lineTo(ref.rotate(-angle, endPoint)));
+            path.addCommand(PathHelper.close());
+            path.end();
+        }
+
+        //****************************//
         function updateData() {
             config.stages = stages.map(x => ({x: x.point.x, y: x.point.y}));
             actionDispatcher(HookActionEnum.DATA_UPDATE);
+        }
+
+        function removeThis() {
+
+            actionDispatcher(HookActionEnum.ELEMENT_DELETED, rootEl);
+            const src: XID = config.src;
+            const trg: XID = config.trg;
+            const srcDef = isDefined(src);
+            const trgDef = isDefined(trg);
+
+            srcDef && actionDispatcher(HookActionEnum.ELEMENT_UNLINKED, src);
+            trgDef && actionDispatcher(HookActionEnum.ELEMENT_UNLINKED, trg);
+            srcDef && trgDef && actionDispatcher(HookActionEnum.ELEMENTS_UNLINKED, src, trg);
+
+            context.removeElement(ID);
+            rootEl.remove();
+            onRemoveCallable.forEach(x => x());
+            onRemoveCallable.clean();
         }
 
         return rootEl;
@@ -723,7 +789,6 @@ const XArrow: XElementFactory = defineElement<XArrowDef>({
 });
 
 export default XArrow;
-
 
 /*
 

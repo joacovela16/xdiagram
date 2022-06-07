@@ -113,7 +113,6 @@ export type XTheme = {
     error: string;
 }
 
-
 export type XIconTool = {
     selectEvents: HookActionEnum[];
     unselectEvents: HookActionEnum[];

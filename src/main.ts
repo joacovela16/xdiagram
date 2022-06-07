@@ -1,31 +1,31 @@
 import {XLightTheme} from "./modules/themes";
-import {PaperRenderer} from "./modules/renderers";
 import {XArrow, XArrowDef, XDefaultNode, XNodeDef, XNodePort, XNodePortDef} from "./modules/components";
-import {XBoardPlugin, XCopyPlugin, XDataChangePlugin, XDeletePlugin, XInteractivePlugin, XLinkerPlugin, XSelectionPlugin} from "./modules/plugins";
-import {HookActionEnum, XDiagram, XElementDef} from "./modules/core";
+import {XBoardPlugin, XCopyPlugin, XDeletePlugin, XInteractivePlugin, XLinkerPlugin, XSelectionPlugin} from "./modules/plugins";
+import {HookActionEnum, XDiagram, XElementDef, XItem} from "./modules/core";
 import XFunctionPort, {XFunctionPortDef} from "./lib/components/XFunctionPort";
+import SVGRenderer from "./lib/renderer/SVGRenderer";
 
 document.body.style.width = '100%';
 document.body.style.height = '400px';
-
-const xDiagram = new XDiagram(document.body, {
+/*
+const xDiagram = new XDiagram(document.getElementById("app"), {
     id: 'test',
     theme: XLightTheme,
-    renderer: PaperRenderer,
+    renderer: SVGRenderer,
     catalog: [
-        XDefaultNode({name: 'rounded-node', strokeWidth: 2, padding: 24, radius: 8}),
-        XNodePort({name: 'port', strokeWidth: 2, padding: 24, radius: 8}),
-        XFunctionPort({name: 'function-port', strokeWidth: 2, padding: 24, radius: 8}),
+        XDefaultNode({name: 'rounded-node', padding: 5, radius: 8}),
+        XNodePort({name: 'port', padding: 5, radius: 8}),
+        XFunctionPort({name: 'function-port', padding: 5, radius: 8}),
         XArrow
     ],
     plugins: [
-        XBoardPlugin(),
+        // XBoardPlugin(),
         XSelectionPlugin,
-        XLinkerPlugin(),
+        // XLinkerPlugin(),
         XInteractivePlugin,
-        XDeletePlugin,
-        XCopyPlugin,
-        XDataChangePlugin()
+        // XDeletePlugin,
+        // XCopyPlugin,
+        // XDataChangePlugin()
     ]
 });
 
@@ -92,7 +92,6 @@ xDiagram.addElement<XNodePortDef>({
     out: 1
 });
 
-
 xDiagram.addElement<XFunctionPortDef>({
     id: 5,
     solver: 'function-port',
@@ -104,13 +103,85 @@ xDiagram.addElement<XFunctionPortDef>({
     in: ["person", "cusotmer", "input2", "input3"],
     out: ["output0"],
     portTextSize: 14
-});
-
+});*/
+/*
 xDiagram.addElement<XArrowDef>({solver: 'x-arrow', src: 2, trg: 1});
 xDiagram.addElement<XArrowDef>({solver: 'x-arrow', src: 2, trg: 'in:0:3'});
-xDiagram.addElement<XArrowDef>({solver: 'x-arrow', src: 2, trg: 'in:2:3'});
+xDiagram.addElement<XArrowDef>({solver: 'x-arrow', src: 2, trg: 'in:2:3'});*/
+/*
 
-xDiagram.getListener().action(HookActionEnum.ELEMENT_SELECTED, node=>{
+xDiagram.getListener().action(HookActionEnum.ELEMENT_SELECTED, node => {
     console.log('Node selected')
     console.log(node)
+})*/
+
+const builder = SVGRenderer(document.getElementById("app"));
+
+const xRect = builder.makeRect();
+xRect.size = builder.makeSize(100, 100);
+xRect.fillColor = 'red';
+
+const xText = builder.makeText();
+xText.content = "hola";
+
+const xItem = builder.makeGroup();
+xItem.addChildren([xRect, xText]);
+
+builder.addItems(xItem);
+
+xRect.center = builder.makePoint(0, 0);
+xText.center = builder.makePoint(0, 0);
+xItem.position = builder.makePoint(100, 100);
+xRect.radius = 8;
+
+const xLine = builder.makeLine();
+xLine.strokeWidth = 4;
+xLine.strokeColor = 'blue';
+xLine.setExtremes(builder.makePoint(40,40), builder.makePoint(100,100))
+builder.addItems(xLine)
+
+const xCircle = builder.makeCircle();
+xCircle.strokeWidth = 2;
+xCircle.strokeColor = 'blue';
+xCircle.radius=50;
+xCircle.fillColor='black';
+builder.addItems(xCircle)
+xCircle.center = builder.makePoint(200, 200);
+
+doDraggable(xItem);
+doDraggable(xLine);
+doDraggable(xCircle);
+
+xItem.on('click', e => {
+
+    const r = builder.makeRect();
+    r.size = xRect.size.multiply(1.5)
+    r.fillColor = undefined;
+    r.strokeColor = 'red';
+    r.strokeWidth = 2;
+    r.dashArray = [4,4];
+    r.center = xRect.center;
+    builder.addItems(r)
+    console.log(xRect.center)
 })
+
+function doDraggable(xItem: XItem): void {
+
+    let isDrag = false;
+    xItem.on('mousedown', e => {
+        isDrag = true;
+    })
+
+    xItem.on('mousemove', e => {
+        isDrag && xItem.moveBy(e.delta)
+    })
+
+    xItem.on('mouseup', e => {
+        isDrag = false;
+    });
+
+    xItem.on('mouseleave', e => {
+        isDrag = false;
+    });
+
+}
