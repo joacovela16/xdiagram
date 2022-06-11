@@ -1,17 +1,52 @@
 import type {PathCommand, XBound, XBuilder, XCircle, XEvent, XEventName, XInteractiveDef, XItem, XLine, XNode, XPoint, XRaster, XRect, XShape, XSize, XText} from "../shared/XRender";
-import type {Callable, XData, XID} from "../shared/XTypes";
+import type {Callable, Handler, XData, XID} from "../shared/XTypes";
 
 import Flatten from '@flatten-js/core'
 import {Intersection, Shapes} from "kld-intersections"
 import {appendTo, attr, clone, create, createTransform, innerSVG, off, on, transform} from "tiny-svg";
 import {LinkedList} from "../shared/XList";
+import {isDefined} from "../shared/XLib";
 
 const {Box, Relations, point} = Flatten;
 
-type Context = {
-    mousemove: LinkedList<Callable>,
-    mouseup: LinkedList<Callable>,
-};
+function mapEventName(name: XEventName): string {
+    if (name === "doubleclick") return "dblclick";
+    if (name === "mousedrag") return "mousemove";
+    return name;
+}
+
+function installEvent(item: XItem, el: Element, name: XEventName, handler: Handler): Callable {
+    const eventName = mapEventName(name);
+    let lastPoint: XPoint;
+
+    const effectiveHandler = (e: any) => {
+        const sPoint = new SPoint(e.clientX, e.clientY);
+        lastPoint || (lastPoint = sPoint);
+        const delta = new SPoint(e.movementX, e.movementY);
+        // lastPoint = sPoint;
+        const event: XEvent = {
+            point: sPoint,
+            delta,
+            target: item,
+            stop() {
+                e.stopPropagation();
+                e.preventDefault();
+            },
+            stopPropagation() {
+                e.stopPropagation();
+            },
+            preventDefault() {
+                e.preventDefault();
+            }
+        };
+        handler(event);
+    };
+
+    on(el, eventName, effectiveHandler)
+
+    return () => off(el, eventName, effectiveHandler);
+
+}
 
 class SPoint implements XPoint {
 
@@ -424,7 +459,6 @@ class SBound implements XBound {
 
 class SItem<T extends SVGGraphicsElement = SVGGraphicsElement> implements XItem {
     id: XID;
-    locked: boolean;
     data: XData;
 
     protected _dashArray: number[];
@@ -439,9 +473,12 @@ class SItem<T extends SVGGraphicsElement = SVGGraphicsElement> implements XItem 
     protected mainEl: SVGElement;
     protected localEl: T;
     protected containerEl?: SVGElement;
+    private tasks: LinkedList<Callable>;
+    private children: LinkedList<SItem>;
 
     constructor(local: T, container?: SVGElement) {
-
+        this.tasks = new LinkedList<Callable>();
+        this.children = new LinkedList<SItem>();
         this.localEl = local;
         this.containerEl = container;
         this.data = new Map<string, any>();
@@ -454,6 +491,31 @@ class SItem<T extends SVGGraphicsElement = SVGGraphicsElement> implements XItem 
             this.mainEl = local;
         }
 
+    }
+
+    protected get isLinked(): boolean {
+        return this.mainEl.isConnected;
+    }
+
+    protected doTask(task: Callable, index?: number): void {
+        if (this.isLinked) task();
+        else {
+            console.debug('adding pending task...');
+            if (isDefined(index)) {
+                this.tasks.insertAt(index, task);
+            } else {
+                this.tasks.append(task);
+            }
+        }
+    }
+
+    protected execTasks(): void {
+        if (this.isLinked) {
+            this.children.forEach(x => x.execTasks());
+            this.children.clean();
+            this.tasks.forEach(x => x());
+            this.tasks.clean();
+        }
     }
 
     protected calculateSize() {
@@ -472,9 +534,12 @@ class SItem<T extends SVGGraphicsElement = SVGGraphicsElement> implements XItem 
     }
 
     set size(value: XSize) {
-        this._size = value;
-        this.bounds.size = value;
-        this.draw();
+        const self = this;
+        self.doTask(() => {
+            self._size = value;
+            self.bounds.size = value;
+            self.draw();
+        }, 0);
     }
 
     protected draw(): void {
@@ -489,13 +554,15 @@ class SItem<T extends SVGGraphicsElement = SVGGraphicsElement> implements XItem 
     }
 
     set position(value: XPoint) {
-        this._position = value;
-        this.updateBound();
-        this.draw();
+        this.doTask(() => {
+            this._position = value;
+            this.updateBound();
+            this.draw();
+        });
     }
 
     protected getBox(): DOMRect {
-        return this.localEl.getBoundingClientRect();
+        return this.mainEl.getBoundingClientRect();
     }
 
     protected updateBound(): void {
@@ -514,7 +581,9 @@ class SItem<T extends SVGGraphicsElement = SVGGraphicsElement> implements XItem 
     }
 
     set bounds(value: XBound) {
-        this._bounds = value;
+        this.doTask(() => {
+            this._bounds = value;
+        });
     }
 
     get dashArray(): number[] {
@@ -522,8 +591,10 @@ class SItem<T extends SVGGraphicsElement = SVGGraphicsElement> implements XItem 
     }
 
     set dashArray(value: number[]) {
-        this._dashArray = value;
-        attr(this.localEl, 'stroke-dasharray', value.join(','));
+        this.doTask(() => {
+            this._dashArray = value;
+            attr(this.localEl, 'stroke-dasharray', value.join(','));
+        });
     }
 
     get fillColor(): string {
@@ -531,8 +602,10 @@ class SItem<T extends SVGGraphicsElement = SVGGraphicsElement> implements XItem 
     }
 
     set fillColor(value: string) {
-        this._fillColor = value;
-        attr(this.localEl, 'fill', value || 'none');
+        this.doTask(() => {
+            this._fillColor = value;
+            attr(this.localEl, 'fill', value || 'none');
+        });
     }
 
     get center(): XPoint {
@@ -540,7 +613,7 @@ class SItem<T extends SVGGraphicsElement = SVGGraphicsElement> implements XItem 
     }
 
     set center(value: XPoint) {
-        this.doCenter(value);
+        this.doTask(() => this.doCenter(value), 1);
     }
 
     protected doCenter(value: XPoint) {
@@ -556,8 +629,10 @@ class SItem<T extends SVGGraphicsElement = SVGGraphicsElement> implements XItem 
     }
 
     set strokeColor(value: string) {
-        this._strokeColor = value;
-        attr(this.localEl, "stroke", value);
+        this.doTask(() => {
+            this._strokeColor = value;
+            attr(this.localEl, "stroke", value);
+        });
     }
 
     get strokeWidth(): number {
@@ -565,8 +640,10 @@ class SItem<T extends SVGGraphicsElement = SVGGraphicsElement> implements XItem 
     }
 
     set strokeWidth(value: number) {
-        this._strokeWidth = value;
-        attr(this.localEl, 'stroke-width', value);
+        this.doTask(() => {
+            this._strokeWidth = value;
+            attr(this.localEl, 'stroke-width', value);
+        });
     }
 
     get visible(): boolean {
@@ -574,21 +651,29 @@ class SItem<T extends SVGGraphicsElement = SVGGraphicsElement> implements XItem 
     }
 
     set visible(value: boolean) {
-        this._visible = value;
-        if (value) {
-            attr(this.mainEl, 'visibility', 'initial');
-        } else {
-            attr(this.mainEl, 'visibility', 'hidden');
-        }
+        this.doTask(() => {
+            this._visible = value;
+            if (value) {
+                attr(this.mainEl, 'visibility', 'initial');
+            } else {
+                attr(this.mainEl, 'visibility', 'hidden');
+            }
+        });
     }
 
     addChild(item: this) {
+        this.children.append(item);
         appendTo(item.mainEl, this.localEl);
+        item.execTasks();
     }
 
     addChildren(items: this[]) {
         const mainEl = this.localEl;
-        items.forEach(x => appendTo(x.mainEl, mainEl));
+        this.children.addAll(items);
+        items.forEach(x => {
+            appendTo(x.mainEl, mainEl);
+            x.execTasks();
+        });
     }
 
     clone(): XItem {
@@ -602,42 +687,8 @@ class SItem<T extends SVGGraphicsElement = SVGGraphicsElement> implements XItem 
         return this._bounds.contains(point);
     }
 
-    on(name: XEventName, handler: (e: XEvent) => void): Callable {
-        const me = this
-        const eventName = SItem.mapEventName(name);
-        let lastPoint: XPoint;
-
-        const effectiveHandler = (e: any) => {
-            const sPoint = new SPoint(e.x, e.y);
-            lastPoint || (lastPoint = sPoint);
-            const delta = new SPoint(e.movementX, e.movementY);
-            // lastPoint = sPoint;
-            const event: XEvent = {
-                point: sPoint,
-                delta,
-                target: me,
-                stop() {
-                    e.stopPropagation();
-                    e.preventDefault();
-                },
-                stopPropagation() {
-                    e.stopPropagation();
-                },
-                preventDefault() {
-                    e.preventDefault();
-                }
-            };
-            handler(event);
-        };
-        on(me.localEl, eventName, effectiveHandler)
-
-        return () => off(me.localEl, eventName, effectiveHandler);
-    }
-
-    private static mapEventName(name: XEventName): string {
-        if (name === "doubleclick") return "dblclick";
-        if (name === "mousedrag") return "mousemove";
-        return name;
+    on(name: XEventName, handler: Handler): Callable {
+        return installEvent(this, this.localEl, name, handler);
     }
 
     remove(): void {
@@ -645,30 +696,50 @@ class SItem<T extends SVGGraphicsElement = SVGGraphicsElement> implements XItem 
     }
 
     rotate(angle: number, center?: XPoint): void {
-        const x = center && center.x;
-        const y = center && center.y;
-        // this.rootEl.rotate(angle, x, y);
-        const svgTransform = transform(this.mainEl);
-        svgTransform.setRotate(angle, x, y);
+        this.doTask(() => {
+            const p = center || this.center;
+            const x = p.x;
+            const y = p.y;
+            const trx = createTransform();
+            trx.setTranslate(-x, -y);
+            trx.setRotate(angle, 0, 0);
+            const svgTransform = transform(this.mainEl);
+            transform(this.mainEl, [trx, svgTransform]);
+            this.calculateSize();
+        })
     }
 
     scale(scale: number, center?: XPoint): void;
     scale(hor: number, ver: number, center?: XPoint): void;
     scale(x: number, y?: XPoint | number, z?: XPoint): void {
+        this.doTask(() => {
 
-        if (typeof x === 'number' && y && typeof y === 'number') {
-            const cx = z && z.x;
-            const cy = z && z.y;
-            // this.rootEl.scale(x, y, cx, cy);
-            const svgTransform = transform(this.mainEl);
-            svgTransform.setScale(cx, cy);
-        } else if (typeof x === 'number' && y && typeof y !== 'number') {
-            const cx = y && y.x;
-            const cy = y && y.y;
-            // this.rootEl.scale(x, x, cx, cy);
-            const svgTransform = transform(this.mainEl);
-            svgTransform.setScale(cx, cy);
-        }
+            if (typeof x === 'number' && typeof y !== 'number') {
+                const p = y || this.center;
+                const mv = createTransform();
+                mv.setTranslate(-p.x, -p.y);
+                mv.setScale(x, x);
+                const svgTransform = transform(this.mainEl);
+                transform(this.mainEl, [mv, svgTransform]);
+                this.calculateSize();
+                return;
+            }
+
+            if (typeof x === 'number' && y && typeof y === 'number') {
+                const cx = z && z.x;
+                const cy = z && z.y;
+                // this.rootEl.scale(x, y, cx, cy);
+                const svgTransform = transform(this.mainEl);
+                svgTransform.setScale(cx, cy);
+            } else if (typeof x === 'number' && y && typeof y !== 'number') {
+                const cx = y && y.x;
+                const cy = y && y.y;
+                // this.rootEl.scale(x, x, cx, cy);
+                const svgTransform = transform(this.mainEl);
+                svgTransform.setScale(cx, cy);
+            }
+            this.calculateSize();
+        });
     }
 
     sendToBack(): void {
@@ -720,7 +791,7 @@ class SCircle extends SNode<SVGCircleElement> implements XCircle {
 
     constructor() {
         super(create('circle'));
-        attr(this.localEl, {cx:0, cy: 0})
+        attr(this.localEl, {cx: 0, cy: 0})
     }
 
     get radius(): number {
@@ -728,11 +799,12 @@ class SCircle extends SNode<SVGCircleElement> implements XCircle {
     }
 
     set radius(value: number) {
-        this._radius = value;
-        attr(this.localEl, {'r': value});
-        this.draw();
+        this.doTask(() => {
+            this._radius = value;
+            attr(this.localEl, {'r': value});
+            this.draw();
+        }, 1);
     }
-
 
     shape(): any {
         const position = this.position;
@@ -749,20 +821,22 @@ class SLine extends SNode<SVGLineElement> implements XLine {
     }
 
     setExtremes(start?: XPoint, end?: XPoint): void {
-        const me = this;
-        if (start) {
-            me.from = start;
-        }
+        this.doTask(() => {
+            const me = this;
+            if (start) {
+                me.from = start;
+            }
 
-        if (end) {
-            me.to = end;
-        }
+            if (end) {
+                me.to = end;
+            }
 
-        const from = me.from;
-        const to = me.to;
-        if (from && to) {
-            attr(me.localEl, {x1: from.x, y1: from.y, x2: to.x, y2: to.y});
-        }
+            const from = me.from;
+            const to = me.to;
+            if (from && to) {
+                attr(me.localEl, {x1: from.x, y1: from.y, x2: to.x, y2: to.y});
+            }
+        }, 0);
     }
 
     shape(): any {
@@ -789,9 +863,11 @@ class SRect extends SNode<SVGRectElement> implements XRect {
     }
 
     set radius(value: number) {
-        this._radius = value;
-        this.calculateSize();
-        this.draw();
+        this.doTask(() => {
+            this._radius = value;
+            this.calculateSize();
+            this.draw();
+        });
     }
 
     protected draw() {
@@ -822,7 +898,7 @@ class SText extends SItem<SVGTextElement> implements XText {
 
     constructor() {
         super(create('text'));
-        attr(this.mainEl, {'user-select': "none"});
+        attr(this.mainEl, {style: 'user-select: none'});
     }
 
     get center(): XPoint {
@@ -830,9 +906,11 @@ class SText extends SItem<SVGTextElement> implements XText {
     }
 
     set center(value: XPoint) {
-        const bound = this.bounds;
-        this._position = new SPoint(-bound.width / 2, bound.height * 0.3);
-        this.draw();
+        this.doTask(() => {
+            const bound = this.bounds;
+            this._position = new SPoint(-bound.width / 2, bound.height * 0.3);
+            this.draw();
+        },1);
     }
 
     get content(): string {
@@ -860,33 +938,45 @@ class SText extends SItem<SVGTextElement> implements XText {
     }
 
     set content(value: string) {
-        innerSVG(this.localEl, value);
-        this.calculateSize();
+        this.doTask(() => {
+            innerSVG(this.localEl, value);
+            this.calculateSize();
+        },0);
     }
 
     set fontFamily(value: string) {
-        attr(this.localEl, 'font-family', value);
-        this.calculateSize();
+        this.doTask(() => {
+            attr(this.localEl, 'font-family', value);
+            this.calculateSize();
+        }, 0);
     }
 
     set fontSize(value: number | string) {
-        attr(this.localEl, 'font-size', value);
-        this.calculateSize();
+        this.doTask(() => {
+            attr(this.localEl, 'font-size', value);
+            this.calculateSize();
+        }, 0);
     }
 
     set fontWeight(value: string | number) {
-        attr(this.localEl, 'font-weight', value);
-        this.calculateSize();
+        this.doTask(() => {
+            attr(this.localEl, 'font-weight', value);
+            this.calculateSize();
+        });
     }
 
     set justification(value: string) {
-        attr(this.localEl, 'anchor', value);
-        this.calculateSize();
+        this.doTask(() => {
+            attr(this.localEl, 'anchor', value);
+            this.calculateSize();
+        }, 0);
     }
 
     set leading(value: number | string) {
-        attr(this.localEl, 'leading', value);
-        this.calculateSize();
+        this.doTask(() => {
+            attr(this.localEl, 'leading', value);
+            this.calculateSize();
+        }, 0);
     }
 }
 
@@ -974,6 +1064,12 @@ class SBuilder implements XBuilder {
         el.append(this.draw);
     }
 
+    board: "svg"
+
+    on(eventName: XEventName, handler: Handler): Callable {
+        return installEvent(this.item, this.draw, eventName, handler);
+    }
+
     addItems(...children: XItem[]): void {
         const i: XItem = this.item;
         i.addChildren(children)
@@ -990,8 +1086,8 @@ class SBuilder implements XBuilder {
     fromSVG(svg: SVGGraphicsElement | string, options?: any): XItem {
         if (typeof svg === 'string') {
             const g = create('g')
-            const item = innerSVG(g, svg) as SVGGraphicsElement;
-            return new SItem(item);
+            innerSVG(g, svg) as SVGGraphicsElement;
+            return new SItem(g);
         }
         return new SItem(svg);
     }

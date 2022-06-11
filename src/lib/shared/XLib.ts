@@ -1,5 +1,5 @@
 import {LinkedList} from "./XList";
-import type {Callable, HookAction, HookDispatcher, HookFilter, HookListener, HookManager, HookManagerProxy, XContext, XIconTool} from "./XTypes";
+import type {Callable, Handler, HookAction, HookDispatcher, HookFilter, HookListener, HookManager, HookManagerProxy, XContext, XIconTool} from "./XTypes";
 import {XElementDef, XPluginDef, XTheme} from "./XTypes";
 import type {XEvent, XItem, XNode, XPoint} from "./XRender";
 import {PathHelper} from "./XRender";
@@ -150,15 +150,18 @@ export function doIconHovering(iconItem: XItem, context: XContext, hoverColor?: 
     const theme = context.theme;
     const style: CSSStyleDeclaration = context.element.style;
 
-    iconItem.bounds.center = position;
+    iconItem.center = position;
     iconItem.strokeColor = theme.neutral;
 
-    const circle = builder.makeCircle(position, 15);
+    const circle = builder.makeCircle();
+    const group = builder.makeGroup([circle, iconItem]);
+
+    circle.center = position;
+    circle.radius = 15;
     circle.fillColor = theme.primaryContent;
     circle.strokeColor = theme.neutral;
     circle.strokeWidth = 2;
 
-    const group = builder.makeGroup([circle, iconItem]);
 
     setHoverBehavior(group,
         () => {
@@ -182,7 +185,59 @@ export function doLinkZone(bind: XItem, hookManager: HookManager, ref?: XItem): 
     );
 }
 
-export function doHover(bind: XItem, inner: (e: XEvent) => void, outer: (e: XEvent) => void) {
+export function doDraggable(
+    bind: XItem,
+    ctx: XContext,
+    target?: XItem,
+    onDragStart?: Handler,
+    onDrag?: Handler,
+    onDragEnd?: Handler,
+    onClick?: Handler,
+    timeout?: number
+): Callable {
+    const timer: Timer = new Timer(timeout || 100);
+    const builder = ctx.builder;
+    const events = new LinkedList<Callable>();
+    let isDragging:boolean = false;
+    const onDragHandler = onDrag || ((_e) => {
+    });
+
+    function cleanAll() {
+        events.forEach(x => x());
+        events.clean();
+    }
+
+    function dragEnd(e: XEvent) {
+        onDragEnd && onDragEnd(e)
+        cleanAll();
+        isDragging=false;
+    }
+
+    const mousedownClean = bind.on('mousedown', e => {
+        timer.handle(() => {
+            isDragging=true;
+            onDragStart && onDragStart(e);
+            events.append(builder.on('mousemove', e => onDragHandler(e)));
+
+            events.append(builder.on('mouseup', e => dragEnd(e)));
+            events.append(builder.on('mouseleave', e => dragEnd(e)));
+        });
+    });
+
+    const clickClean = bind.on('click', (e) => {
+        timer.clear();
+       !isDragging && onClick && onClick(e);
+    })
+
+    return () => {
+        mousedownClean();
+        clickClean();
+        cleanAll();
+    };
+
+}
+
+export function doHover(bind: XItem, inner: Handler, outer: Handler) {
     bind.on("mouseenter", e => inner(e));
     bind.on('mouseleave', e => outer(e));
 }
@@ -332,8 +387,10 @@ export function doIconTool(name: string, handler: (context: XContext, hook: Hook
             const theme: XTheme = context.theme;
             const actionListener = hook.listener.action;
             const filterDispatcher = hook.dispatcher.filter;
+            const iconItem = b.fromSVG(spec.icon(theme));
+
             const icon = doIconHovering(
-                b.fromSVG(spec.icon(theme)),
+                iconItem,
                 context,
                 spec.iconHoverColor && spec.iconHoverColor(theme)
             );

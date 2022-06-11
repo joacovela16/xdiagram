@@ -18,7 +18,7 @@ export const XDeletePlugin = doIconTool('x-delete-plugin', () => {
         },
         icon(theme: XTheme): string {
             return `
-                <g stroke-width="2" stroke="${theme.primaryContent}" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <g stroke-width="2" stroke="${theme.neutral}" fill="none" stroke-linecap="round" stroke-linejoin="round">
                    <line x1="4" y1="7" x2="20" y2="7"></line>
                    <line x1="10" y1="11" x2="10" y2="17"></line>
                    <line x1="14" y1="11" x2="14" y2="17"></line>

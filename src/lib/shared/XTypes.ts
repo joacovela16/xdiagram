@@ -1,5 +1,5 @@
 import type {LinkedList} from "./XList";
-import type {XBuilder, XBuilderFactory, XItem, XNode} from "./XRender";
+import type {XBuilder, XBuilderFactory, XEvent, XItem, XNode} from "./XRender";
 import type {HookActionEnum, HookFilterEnum} from "./Instructions";
 import type {Option} from "./Option";
 import {XBound, XPoint} from "./XRender";
@@ -30,6 +30,7 @@ export type HookAction = HookActionEnum | string;
 export type HookFilter = HookFilterEnum | string;
 
 export type Callable = () => void;
+export type Handler = (e: XEvent) => void;
 
 export type HookListener = {
     action(name: HookAction, f: Function): Callable;

@@ -1,4 +1,4 @@
-import type {Callable, XData, XID} from "./XTypes";
+import type {Callable, Handler, XData, XID} from "./XTypes";
 
 export type XEventName =
     "mousedown" |
@@ -256,7 +256,6 @@ export interface XBound {
 export interface XItem {
     id: XID
     visible: boolean;
-    locked: boolean;
     strokeWidth: number;
     strokeColor: string;
     fillColor: string;
@@ -278,7 +277,7 @@ export interface XItem {
 
     addChild(item: this);
 
-    on(name: XEventName, handler: (e: XEvent) => void): Callable;
+    on(name: XEventName, handler: Handler): Callable;
 
     moveTo(delta: XPoint): void
 
@@ -301,7 +300,7 @@ export interface XNode extends XItem {
 
 export interface XRect extends XNode {
     size: XSize
-    radius:number;
+    radius: number;
 }
 
 export interface XCircle extends XNode {
@@ -324,6 +323,7 @@ export interface XShape extends XNode {
 
 export interface XRaster extends XItem {
     size: XSize;
+
     setPixel(x: number, y: number, color: string): void;
 
     setPixel(x: number, y: number, color: string): void;
@@ -342,6 +342,8 @@ export interface XText extends XItem {
 export type XBuilderFactory = (el: HTMLElement) => XBuilder;
 
 export interface XBuilder {
+    board: "canvas" | "svg";
+    on(eventName: XEventName, handler: (e: XEvent) => void): Callable
 
     addItems(...children: XItem[]): void;
 

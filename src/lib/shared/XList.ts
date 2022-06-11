@@ -1,5 +1,6 @@
 import {isUndefined} from "./XLib";
 import doOption, {Option} from "./Option";
+import {append} from "tiny-svg";
 
 export class Record<T> {
     previous: Record<T>
@@ -23,7 +24,8 @@ export class Record<T> {
             me.belongTo.remove(me);
         }
     }
-    getAndRemove(f: (x: T) =>void): void{
+
+    getAndRemove(f: (x: T) => void): void {
         const me = this;
         f(me.data);
         me.remove();
@@ -58,6 +60,10 @@ export class LinkedList<T> {
         return record;
     }
 
+    addAll(data: T[]): void {
+        const me = this;
+        data.forEach(x => me.append(x));
+    }
 
     prepend(data: T): Record<T> {
         const me: LinkedList<T> = this;
@@ -140,6 +146,37 @@ export class LinkedList<T> {
         const r = this.findRecord(p);
         r.foreach(x => x.remove());
         return r.isDefined();
+    }
+
+    insertAt(index: number, data: T): void {
+
+        if (this.isEmpty()) {
+            this.append(data);
+            return;
+        }
+
+        let i = 0;
+        let item = this.first;
+        while (i < index && item) {
+            item = item.next;
+            i++;
+        }
+        // console.log(item && i === index)
+        // console.log(index >= i)
+        if (item && i === index) {
+            const r = new Record<T>(item.previous, data, item, this);
+            item.previous && (item.previous.next = r);
+            item.previous = r;
+            this.length += 1;
+            if (index === 0){
+               this.first = r;
+            }
+        }else if (index >= i){
+            const r = new Record<T>(this.last, data, null, this);
+            this.length += 1;
+            this.last.next = r;
+            this.last = r;
+        }
     }
 
     findRecord(p: (item: T) => boolean): Option<Record<T>> {

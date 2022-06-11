@@ -30,9 +30,8 @@ const XSelectionPlugin: XPluginDef = definePlugin({
             return {
                 build(point: XPoint, size: XSize, parent: XNode): void {
                     shape.visible = true;
-                    console.log(parent.center)
-                    shape.center = parent.center;
                     shape.size = size;
+                    shape.center = parent.center;
                 },
                 clean() {
                     shape.visible = false;

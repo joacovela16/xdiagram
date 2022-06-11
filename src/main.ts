@@ -1,13 +1,14 @@
 import {XLightTheme} from "./modules/themes";
 import {XArrow, XArrowDef, XDefaultNode, XNodeDef, XNodePort, XNodePortDef} from "./modules/components";
 import {XBoardPlugin, XCopyPlugin, XDeletePlugin, XInteractivePlugin, XLinkerPlugin, XSelectionPlugin} from "./modules/plugins";
-import {HookActionEnum, XDiagram, XElementDef, XItem} from "./modules/core";
+import {Callable, HookActionEnum, LinkedList, XDiagram, XElementDef, XItem} from "./modules/core";
 import XFunctionPort, {XFunctionPortDef} from "./lib/components/XFunctionPort";
 import SVGRenderer from "./lib/renderer/SVGRenderer";
 
 document.body.style.width = '100%';
 document.body.style.height = '400px';
-/*
+
+
 const xDiagram = new XDiagram(document.getElementById("app"), {
     id: 'test',
     theme: XLightTheme,
@@ -23,7 +24,7 @@ const xDiagram = new XDiagram(document.getElementById("app"), {
         XSelectionPlugin,
         // XLinkerPlugin(),
         XInteractivePlugin,
-        // XDeletePlugin,
+        XDeletePlugin,
         // XCopyPlugin,
         // XDataChangePlugin()
     ]
@@ -57,7 +58,7 @@ xDiagram.addElement<XNodeDef>({
         y: 100,
     }
 });
-
+/*
 xDiagram.addElement<XNodeDef>({
     id: 2,
     solver: 'rounded-node',
@@ -114,39 +115,49 @@ xDiagram.getListener().action(HookActionEnum.ELEMENT_SELECTED, node => {
     console.log('Node selected')
     console.log(node)
 })*/
+/*
+const linkedList = new LinkedList<number>();
+linkedList.append(1);
+linkedList.forEach(x => console.log(x));
+linkedList.insertAt(1,0)
+linkedList.forEach(x => console.log(x));
 
 const builder = SVGRenderer(document.getElementById("app"));
 
 const xRect = builder.makeRect();
 xRect.size = builder.makeSize(100, 100);
 xRect.fillColor = 'red';
+xRect.radius = 8;
+xRect.center = builder.makePoint(0, 0);
+xRect.scale(1.5)
+xRect.rotate(45)
 
 const xText = builder.makeText();
+xText.center = builder.makePoint(0, 0);
 xText.content = "hola";
 
 const xItem = builder.makeGroup();
-xItem.addChildren([xRect, xText]);
-
-builder.addItems(xItem);
-
-xRect.center = builder.makePoint(0, 0);
-xText.center = builder.makePoint(0, 0);
 xItem.position = builder.makePoint(100, 100);
-xRect.radius = 8;
 
 const xLine = builder.makeLine();
 xLine.strokeWidth = 4;
 xLine.strokeColor = 'blue';
-xLine.setExtremes(builder.makePoint(40,40), builder.makePoint(100,100))
-builder.addItems(xLine)
+xLine.setExtremes(builder.makePoint(40, 40), builder.makePoint(100, 100))
+
 
 const xCircle = builder.makeCircle();
 xCircle.strokeWidth = 2;
 xCircle.strokeColor = 'blue';
-xCircle.radius=50;
-xCircle.fillColor='black';
-builder.addItems(xCircle)
+xCircle.radius = 50;
+xCircle.fillColor = 'black';
 xCircle.center = builder.makePoint(200, 200);
+
+builder.addItems(xCircle);
+builder.addItems(xLine);
+
+
+builder.addItems(xItem);
+xItem.addChildren([xRect, xText]);
 
 doDraggable(xItem);
 doDraggable(xLine);
@@ -155,33 +166,32 @@ doDraggable(xCircle);
 xItem.on('click', e => {
 
     const r = builder.makeRect();
-    r.size = xRect.size.multiply(1.5)
+    r.size = xRect.size.multiply(1.1)
     r.fillColor = undefined;
     r.strokeColor = 'red';
     r.strokeWidth = 2;
-    r.dashArray = [4,4];
+    r.dashArray = [4, 4];
     r.center = xRect.center;
     builder.addItems(r)
-    console.log(xRect.center)
 })
 
 function doDraggable(xItem: XItem): void {
 
     let isDrag = false;
+    const events = new LinkedList<Callable>()
+
+    function cleanAll() {
+        events.forEach(x => x());
+        events.clean();
+    }
+
     xItem.on('mousedown', e => {
         isDrag = true;
+        events.append(builder.on('mousemove', e => xItem.moveBy(e.delta)));
+
+        events.append(builder.on('mouseup', e => cleanAll()));
+        events.append(builder.on('mouseleave', e => cleanAll()));
     })
-
-    xItem.on('mousemove', e => {
-        isDrag && xItem.moveBy(e.delta)
-    })
-
-    xItem.on('mouseup', e => {
-        isDrag = false;
-    });
-
-    xItem.on('mouseleave', e => {
-        isDrag = false;
-    });
 
 }
+*/

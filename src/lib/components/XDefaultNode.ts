@@ -74,7 +74,7 @@ export default function XDefaultNode(conf: XNodeRectDef): XElementFactory {
                         }
                     },
                     [Command.elementDrag](point: XPoint) {
-                        rootEl.moveTo(point);
+                        rootEl.moveBy(point);
                         actionDispatcher(`${rootEl.id}-drag`, rootEl);
                     }
                 }
@@ -91,7 +91,6 @@ export default function XDefaultNode(conf: XNodeRectDef): XElementFactory {
 
             context.getLayer('middle').addChild(rootEl);
 
-            textEl.locked = true;
             textEl.content = getOrElse(config.text, "...");
             textEl.fontSize = getOrElse(config.fontSize, 28);
             textEl.fillColor = getOrElse(config.textColor, theme.baseContent);
@@ -99,7 +98,7 @@ export default function XDefaultNode(conf: XNodeRectDef): XElementFactory {
             const textPaperBounds = textEl.bounds.clone();
             textPaperBounds.height = doNumberSnap(textPaperBounds.height + padding);
             textPaperBounds.width = doNumberSnap(textPaperBounds.width * 1.2);
-            textPaperBounds.center = textEl.bounds.center;
+            // textPaperBounds.center = textEl.bounds.center;
 
             rectEl.size = textPaperBounds.size;
             rectEl.radius = radius;
@@ -107,12 +106,12 @@ export default function XDefaultNode(conf: XNodeRectDef): XElementFactory {
             rectEl.strokeWidth = getOrElse(config.strokeWidth, 2);
             rectEl.fillColor = getOrElse(config.fillColor, theme.primaryContent);
 
-            rootEl.id = config.id;
             rootEl.position = initialPosition;
-            rootEl.data = config;
+            rectEl.center = b.makePoint(0,0);
+            textEl.center = b.makePoint(0,0);
 
-            rectEl.center = initialPosition;
-            textEl.center = initialPosition;
+            rootEl.id = config.id;
+            rootEl.data = config;
 
             config.linkable = true;
 
