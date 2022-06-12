@@ -1,9 +1,10 @@
 import {doLinkZone, doNumberSnap, doReceptor, getOrElse} from "../shared/XLib";
-import {HookManager, type XContext, XElementDef, type XElementFactory, type XTheme} from "../shared/XTypes";
+import {Callable, HookManager, type XContext, XElementDef, type XElementFactory, type XTheme} from "../shared/XTypes";
 import type {XBuilder, XNode, XPoint} from "../shared/XRender";
 import {Command, HookActionEnum, HookFilterEnum} from "../shared/Instructions";
 import {defineElement} from "../shared/XHelper";
 import {XItem} from "../shared/XRender";
+import {LinkedList} from "../shared/XList";
 
 interface XNodeRectDef {
     name: string;
@@ -34,6 +35,7 @@ export default function XDefaultNode(conf: XNodeRectDef): XElementFactory {
     return defineElement<XNodeDef>({
         name: conf.name,
         build(context: XContext, hookManager: HookManager, cfg: XNodeDef): XNode {
+            const onDestroyTasks = new LinkedList<Callable>()
             const config: XNodeDef = {...cfg, ...conf};
             const position: Coord = config.position;
             const b: XBuilder = context.builder;
@@ -52,15 +54,12 @@ export default function XDefaultNode(conf: XNodeRectDef): XElementFactory {
                 {
                     [Command.onElementLinkIn]() {
                         rectEl.strokeColor = theme.accent;
-                        rectEl.strokeWidth = 3;
                     },
                     [Command.onElementLinkOut]() {
                         rectEl.strokeColor = getOrElse(config.strokeColor, theme.primary);
-                        rectEl.strokeWidth = getOrElse(config.strokeWidth, 0);
                     },
                     [Command.onElementNormal]() {
                         rectEl.strokeColor = getOrElse(config.strokeColor, theme.primary);
-                        rectEl.strokeWidth = getOrElse(config.strokeWidth, 0);
                     },
                     [Command.onElementError]() {
                         rectEl.strokeColor = theme.error;
@@ -71,6 +70,8 @@ export default function XDefaultNode(conf: XNodeRectDef): XElementFactory {
                             rootEl.remove();
                             actionDispatcher(HookActionEnum.ELEMENT_DELETED, rootEl);
                             actionDispatcher(`${rootEl.id}-deleted`);
+                            onDestroyTasks.forEach(x => x());
+                            onDestroyTasks.clean();
                         }
                     },
                     [Command.elementDrag](point: XPoint) {
@@ -98,7 +99,6 @@ export default function XDefaultNode(conf: XNodeRectDef): XElementFactory {
             const textPaperBounds = textEl.bounds.clone();
             textPaperBounds.height = doNumberSnap(textPaperBounds.height + padding);
             textPaperBounds.width = doNumberSnap(textPaperBounds.width * 1.2);
-            // textPaperBounds.center = textEl.bounds.center;
 
             rectEl.size = textPaperBounds.size;
             rectEl.radius = radius;
@@ -107,15 +107,15 @@ export default function XDefaultNode(conf: XNodeRectDef): XElementFactory {
             rectEl.fillColor = getOrElse(config.fillColor, theme.primaryContent);
 
             rootEl.position = initialPosition;
-            rectEl.center = b.makePoint(0,0);
-            textEl.center = b.makePoint(0,0);
+            rectEl.center = b.makePoint(0, 0);
+            textEl.center = b.makePoint(0, 0);
 
             rootEl.id = config.id;
             rootEl.data = config;
 
             config.linkable = true;
 
-            doLinkZone(rootEl, hookManager);
+            onDestroyTasks.append(doLinkZone(rootEl, hookManager));
             actionDispatcher("x-make-interactive", rootEl, rootEl);
 
             return rootEl;

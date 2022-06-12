@@ -162,7 +162,6 @@ export function doIconHovering(iconItem: XItem, context: XContext, hoverColor?: 
     circle.strokeColor = theme.neutral;
     circle.strokeWidth = 2;
 
-
     setHoverBehavior(group,
         () => {
             circle.fillColor = hoverColor || theme.primaryFocus;
@@ -176,9 +175,9 @@ export function doIconHovering(iconItem: XItem, context: XContext, hoverColor?: 
     return group;
 }
 
-export function doLinkZone(bind: XItem, hookManager: HookManager, ref?: XItem): void {
+export function doLinkZone(bind: XItem, hookManager: HookManager, ref?: XItem): Callable {
     const actionDispatcher = hookManager.dispatcher.action;
-    doHover(
+    return doHover(
         bind,
         () => actionDispatcher(HookActionEnum.LINK_ZONE_IN, ref || bind),
         () => actionDispatcher(HookActionEnum.LINK_ZONE_OUT, ref || bind)
@@ -198,7 +197,7 @@ export function doDraggable(
     const timer: Timer = new Timer(timeout || 100);
     const builder = ctx.builder;
     const events = new LinkedList<Callable>();
-    let isDragging:boolean = false;
+    let isDragging: boolean = false;
     const onDragHandler = onDrag || ((_e) => {
     });
 
@@ -208,17 +207,16 @@ export function doDraggable(
     }
 
     function dragEnd(e: XEvent) {
-        onDragEnd && onDragEnd(e)
+        isDragging = false;
         cleanAll();
-        isDragging=false;
+        onDragEnd && onDragEnd(e)
     }
 
     const mousedownClean = bind.on('mousedown', e => {
         timer.handle(() => {
-            isDragging=true;
+            isDragging = true;
             onDragStart && onDragStart(e);
             events.append(builder.on('mousemove', e => onDragHandler(e)));
-
             events.append(builder.on('mouseup', e => dragEnd(e)));
             events.append(builder.on('mouseleave', e => dragEnd(e)));
         });
@@ -226,7 +224,7 @@ export function doDraggable(
 
     const clickClean = bind.on('click', (e) => {
         timer.clear();
-       !isDragging && onClick && onClick(e);
+        !isDragging && onClick && onClick(e);
     })
 
     return () => {
@@ -237,9 +235,13 @@ export function doDraggable(
 
 }
 
-export function doHover(bind: XItem, inner: Handler, outer: Handler) {
-    bind.on("mouseenter", e => inner(e));
-    bind.on('mouseleave', e => outer(e));
+export function doHover(bind: XItem, inner: Handler, outer: Handler): Callable {
+    const mouseEnter = bind.on("mouseenter", e => inner(e));
+    const mouseLeave = bind.on('mouseleave', e => outer(e));
+    return () => {
+        mouseEnter();
+        mouseLeave();
+    }
 }
 
 export function doPointer(bind: XItem, context: XContext): void {
@@ -278,7 +280,6 @@ export function doLinker(
     const line = b.makePath();
 
     let isDragging: boolean = false;
-    const timer = new Timer(300);
     let isValid: boolean;
     let targetNode: XNode;
 
@@ -289,6 +290,42 @@ export function doLinker(
     context.getLayer('back').addChild(line);
 
     onDestroy.push(
+        doDraggable(
+            trigger,
+            context,
+            undefined,
+            e => {
+                // drag start
+                line.visible = true;
+                doListeners();
+            },
+            e => {
+                // on drag
+                line.begin();
+                line.addCommand(PathHelper.moveTo(startFrom.position));
+                line.addCommand(PathHelper.lineTo(e.point));
+                line.end();
+            },
+            e => {
+                // drag stop
+                targetNode && targetNode.command(Command.onElementNormal);
+                line.visible = false;
+
+                if (isValid && targetNode) {
+                    const srcID = source.id;
+                    const trgID = targetNode.id;
+                    const localCfg: XElementDef = {solver, src: srcID, trg: trgID};
+                    actionDispatcher(HookActionEnum.ELEMENT_ADD, localCfg);
+                }
+                targetNode = null;
+                isValid = false;
+                cleanListeners();
+
+            },
+        )
+    );
+
+    /*onDestroy.push(
         trigger.on('mousedown', () => {
             timer.clear();
             timer.handle(() => {
@@ -328,7 +365,7 @@ export function doLinker(
                 line.addCommand(PathHelper.lineTo(event.point));
                 line.end();
             })
-    );
+    );*/
 
     function cleanListeners() {
         listeners.forEach(x => x());
@@ -337,12 +374,11 @@ export function doLinker(
 
     function doListeners() {
 
-        line.visible = true;
         listeners
             .push(
                 actionListener(HookActionEnum.LINK_ZONE_IN, (node: XNode) => {
 
-                    if (isDragging && source.id !== node.id) {
+                    if (source.id !== node.id) {
                         targetNode = node;
                         isValid = filterDispatcher(HookFilterEnum.ELEMENTS_CAN_LINK, true, source, node);
                         if (isValid) {
@@ -359,11 +395,9 @@ export function doLinker(
         listeners
             .push(
                 actionListener(HookActionEnum.LINK_ZONE_OUT, (node: XNode) => {
-                    console.log(node)
                     node.command(Command.onElementLinkOut);
                     line.strokeColor = theme.primary;
                     targetNode = null;
-                    console.log('out')
                 })
             );
     }
