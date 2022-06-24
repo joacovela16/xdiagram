@@ -1,7 +1,7 @@
 import {XLightTheme} from "./modules/themes";
 import {XArrow, XArrowDef, XDefaultNode, XNodeDef, XNodePort, XNodePortDef} from "./modules/components";
 import {XBoardPlugin, XCopyPlugin, XDeletePlugin, XInteractivePlugin, XLinkerPlugin, XSelectionPlugin} from "./modules/plugins";
-import {Callable, HookActionEnum, LinkedList, XDiagram, XElementDef, XItem} from "./modules/core";
+import {Callable, HookActionEnum, LinkedList, PathHelper, XDiagram, XElementDef, XItem, XPoint, XShape} from "./modules/core";
 import XFunctionPort, {XFunctionPortDef} from "./lib/components/XFunctionPort";
 import SVGRenderer from "./lib/renderer/SVGRenderer";
 
@@ -58,7 +58,7 @@ xDiagram.addElement<XNodeDef>({
         y: 100,
     }
 });
-/*
+
 xDiagram.addElement<XNodeDef>({
     id: 2,
     solver: 'rounded-node',
@@ -68,7 +68,7 @@ xDiagram.addElement<XNodeDef>({
         y: 200,
     }
 });
-
+/*
 xDiagram.addElement<XNodePortDef>({
     id: 3,
     solver: 'port',
@@ -105,8 +105,8 @@ xDiagram.addElement<XFunctionPortDef>({
     out: ["output0"],
     portTextSize: 14
 });*/
-/*
 xDiagram.addElement<XArrowDef>({solver: 'x-arrow', src: 2, trg: 1});
+/*
 xDiagram.addElement<XArrowDef>({solver: 'x-arrow', src: 2, trg: 'in:0:3'});
 xDiagram.addElement<XArrowDef>({solver: 'x-arrow', src: 2, trg: 'in:2:3'});*/
 /*
@@ -115,6 +115,7 @@ xDiagram.getListener().action(HookActionEnum.ELEMENT_SELECTED, node => {
     console.log('Node selected')
     console.log(node)
 })*/
+
 /*
 const linkedList = new LinkedList<number>();
 linkedList.append(1);
@@ -194,4 +195,28 @@ function doDraggable(xItem: XItem): void {
     })
 
 }
+
+const path = builder.makePath();
+builder.addItems(path);
+path.fillColor = 'orange'
+defaultTriangleRenderer(
+    builder.makePoint(300,300),
+    builder.makePoint(300,350),
+    10,
+    20,
+    path
+)
+
+function defaultTriangleRenderer(startPoint: XPoint, endPoint: XPoint, length: number, angle: number, path: XShape): void {
+    const v = startPoint.subtract(endPoint).normalize(length);
+    const ref = endPoint.add(v);
+
+    path.begin();
+    path.addCommand(PathHelper.moveTo(endPoint));
+    path.addCommand(PathHelper.lineTo(ref.rotate(angle, endPoint)));
+    path.addCommand(PathHelper.lineTo(ref.rotate(-angle, endPoint)));
+    path.addCommand(PathHelper.close());
+    path.end();
+}
+
 */

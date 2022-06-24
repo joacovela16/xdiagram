@@ -2,12 +2,12 @@ import type {PathCommand, XBound, XBuilder, XCircle, XEvent, XEventName, XIntera
 import type {Callable, Handler, XData, XID} from "../shared/XTypes";
 
 import Flatten from '@flatten-js/core'
-import {Intersection, Shapes} from "kld-intersections"
+import {Intersection, Shapes, IntersectionQuery} from "kld-intersections"
 import {appendTo, attr, clone, create, createTransform, innerSVG, off, on, transform} from "tiny-svg";
 import {LinkedList} from "../shared/XList";
 import {isDefined} from "../shared/XLib";
 
-const {Box, Relations, point} = Flatten;
+const {Box, Relations, point, line} = Flatten;
 
 function mapEventName(name: XEventName): string {
     if (name === "doubleclick") return "dblclick";
@@ -141,12 +141,24 @@ class SPoint implements XPoint {
     }
 
     normalize(length?: number): XPoint {
-        const mag = (length || 1) * Math.sqrt(this.x * this.x + this.y * this.y);
-        return new SPoint(this.x / mag, this.y / mag);
+        const mag = Math.sqrt(this.x * this.x + this.y * this.y);
+        const p = this.multiply(length || 1);
+
+        return p.divide(mag);
     }
 
     rotate(angle: number, center: this): XPoint {
-        return new SPoint(center.x * Math.cos(angle) - center.y * Math.sin(angle), center.y * Math.cos(angle) + center.x * Math.sin(angle));
+        const cx = center.x;
+        const cy = center.y;
+        const x = this.x;
+        const y = this.y;
+
+        var radians = (Math.PI / 180) * angle,
+            cos = Math.cos(radians),
+            sin = Math.sin(radians),
+            nx = (cos * (x - cx)) + (sin * (y - cy)) + cx,
+            ny = (cos * (y - cy)) - (sin * (x - cx)) + cy;
+        return new SPoint(nx, ny);
     }
 
     round(): XPoint {
@@ -406,7 +418,7 @@ class SBound implements XBound {
             const box2 = new Box(p.x, p.y, br.x, br.y);
             return Relations.inside(box2, box)
         }
-        return Relations.inside(point(p.x, p.y), box);
+        return Relations.inside(box, line(point(p.x, p.y)));
     }
 
     expand(amount: number | XSize | XPoint): XBound;
@@ -491,6 +503,7 @@ class SItem<T extends SVGGraphicsElement = SVGGraphicsElement> implements XItem 
             this.mainEl = local;
         }
 
+        this.fillColor = 'none';
     }
 
     protected get isLinked(): boolean {
@@ -684,7 +697,7 @@ class SItem<T extends SVGGraphicsElement = SVGGraphicsElement> implements XItem 
     }
 
     contains(point: XPoint): boolean {
-        return this._bounds.contains(point);
+        return this.bounds.contains(point);
     }
 
     on(name: XEventName, handler: Handler): Callable {
@@ -910,7 +923,7 @@ class SText extends SItem<SVGTextElement> implements XText {
             const bound = this.bounds;
             this._position = new SPoint(-bound.width / 2, bound.height * 0.3);
             this.draw();
-        },1);
+        }, 1);
     }
 
     get content(): string {
@@ -941,7 +954,7 @@ class SText extends SItem<SVGTextElement> implements XText {
         this.doTask(() => {
             innerSVG(this.localEl, value);
             this.calculateSize();
-        },0);
+        }, 0);
     }
 
     set fontFamily(value: string) {
