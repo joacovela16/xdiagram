@@ -127,6 +127,7 @@ const XArrow: XElementFactory = defineElement<XArrowDef>({
         stagesCount = stages.length;
         path.strokeColor = theme.accent;
         path.strokeWidth = 2;
+        path.fillColor = undefined;
         rootEl.id = config.id;
         config.linkable = false;
 
@@ -230,7 +231,10 @@ const XArrow: XElementFactory = defineElement<XArrowDef>({
         }
 
         function buildVertex(stage: XStage): void {
-            const circle = b.makeCircle(stage.point, 10);
+            const circle = b.makeCircle();
+            circle.center = stage.point;
+            circle.radius = 10;
+
             const xDraw: XDraw = {
                 draw(): void {
                     circle.position = stage.point;

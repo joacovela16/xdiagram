@@ -1,13 +1,12 @@
 import {XLightTheme} from "./modules/themes";
 import {XArrow, XArrowDef, XDefaultNode, XNodeDef, XNodePort, XNodePortDef} from "./modules/components";
-import {XBoardPlugin, XCopyPlugin, XDeletePlugin, XInteractivePlugin, XLinkerPlugin, XSelectionPlugin} from "./modules/plugins";
+import {XBoardPlugin, XCopyPlugin, XDataChangePlugin, XDeletePlugin, XInteractivePlugin, XLinkerPlugin, XSelectionPlugin} from "./modules/plugins";
 import {Callable, HookActionEnum, LinkedList, PathHelper, XDiagram, XElementDef, XItem, XPoint, XShape} from "./modules/core";
 import XFunctionPort, {XFunctionPortDef} from "./lib/components/XFunctionPort";
 import SVGRenderer from "./lib/renderer/SVGRenderer";
 
 document.body.style.width = '100%';
 document.body.style.height = '400px';
-
 
 const xDiagram = new XDiagram(document.getElementById("app"), {
     id: 'test',
@@ -22,11 +21,11 @@ const xDiagram = new XDiagram(document.getElementById("app"), {
     plugins: [
         // XBoardPlugin(),
         XSelectionPlugin,
-        // XLinkerPlugin(),
+        XLinkerPlugin(),
         XInteractivePlugin,
         XDeletePlugin,
-        // XCopyPlugin,
-        // XDataChangePlugin()
+        XCopyPlugin,
+        XDataChangePlugin()
     ]
 });
 
@@ -124,6 +123,20 @@ linkedList.insertAt(1,0)
 linkedList.forEach(x => console.log(x));
 
 const builder = SVGRenderer(document.getElementById("app"));
+const icon = builder.fromSVG(
+    `
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+   <desc>Download more icon variants from https://tabler-icons.io/i/ball-basketball</desc>
+   <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+   <circle cx="12" cy="12" r="9"></circle>
+   <line x1="5.65" y1="5.65" x2="18.35" y2="18.35"></line>
+   <line x1="5.65" y1="18.35" x2="18.35" y2="5.65"></line>
+   <path d="M12 3a9 9 0 0 0 9 9"></path>
+   <path d="M3 12a9 9 0 0 1 9 9"></path>
+</svg>`
+)
+icon.center = builder.makePoint(300, 300);
+builder.addItems(icon);
 
 const xRect = builder.makeRect();
 xRect.size = builder.makeSize(100, 100);
